@@ -1,0 +1,1 @@
+export type CategoryKey = 'ui-ux' | 'social' | 'branding';

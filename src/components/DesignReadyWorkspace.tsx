@@ -1,4 +1,5 @@
-import { CheckCircle2, Plus, TriangleAlert, X, Trash2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { CheckCircle2, Plus, TriangleAlert, X, Trash2, LogOut } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { CATEGORIES, CHECKLIST_ITEMS } from '../data';
@@ -294,7 +295,9 @@ export function DesignReadyWorkspace() {
   const initialWorkspaceState = loadWorkspaceState();
 
   const [tasks, setTasks] = useState<WorkspaceTask[]>(initialWorkspaceState.tasks);
-  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(
+    initialWorkspaceState.tasks[0]?.id ?? null,
+  );
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<WorkspaceTask | null>(null);
@@ -309,22 +312,15 @@ export function DesignReadyWorkspace() {
     window.localStorage.setItem(TASK_SEQUENCE_KEY, String(nextTaskNumber));
   }, [nextTaskNumber, tasks]);
 
-  useEffect(() => {
-    if (tasks.length === 0) {
-      return;
-    }
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
 
-    const taskStillExists = tasks.some((task) => task.id === activeTaskId);
-
-    if (!taskStillExists) {
-      setActiveTaskId(tasks[0].id);
-    }
+  // Menentukan active task secara deklaratif tanpa memicu useEffect setState
+  const activeTask = useMemo(() => {
+    if (tasks.length === 0) return null;
+    return tasks.find((task) => task.id === activeTaskId) ?? tasks[0];
   }, [activeTaskId, tasks]);
-
-  const activeTask = useMemo(
-    () => tasks.find((task) => task.id === activeTaskId) ?? tasks[0] ?? null,
-    [activeTaskId, tasks],
-  );
 
   const taskCards = tasks.map((task) => {
     const progress = getTaskProgress(task);
@@ -334,7 +330,7 @@ export function DesignReadyWorkspace() {
       name: task.name,
       categoryLabel: getCategoryLabel(task.categoryKey),
       progressPercent: progress.progressPercent,
-      isActive: task.id === activeTaskId,
+      isActive: task.id === (activeTask?.id ?? null),
     };
   });
 
@@ -426,8 +422,10 @@ export function DesignReadyWorkspace() {
         return [];
       }
 
-      const nextActiveTaskId = activeTaskId === taskToDelete.id ? nextTasks[0].id : activeTaskId;
-      setActiveTaskId(nextActiveTaskId);
+      if (activeTaskId === taskToDelete.id) {
+        setActiveTaskId(nextTasks[0].id);
+      }
+
       return nextTasks;
     });
 
@@ -460,14 +458,25 @@ export function DesignReadyWorkspace() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setIsCreateTaskOpen(true)}
-            className="inline-flex items-center gap-2 rounded-2xl border border-violet-500/25 bg-violet-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-400"
-          >
-            <Plus className="h-4 w-4" />
-            Buat Task Baru
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsCreateTaskOpen(true)}
+              className="inline-flex items-center gap-2 rounded-2xl border border-violet-500/25 bg-violet-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-400"
+            >
+              <Plus className="h-4 w-4" />
+              Buat Task Baru
+            </button>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
+            >
+              <LogOut className="h-4 w-4 text-rose-400" />
+              Sign Out
+            </button>
+          </div>
         </div>
       </header>
 
@@ -475,7 +484,7 @@ export function DesignReadyWorkspace() {
         <div className="grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
           <Sidebar
             tasks={taskCards}
-            activeTaskId={activeTaskId}
+            activeTaskId={activeTask?.id ?? null}
             onSelectTask={setActiveTaskId}
             onCreateTask={() => setIsCreateTaskOpen(true)}
             onRequestDeleteTask={handleRequestDeleteTask}

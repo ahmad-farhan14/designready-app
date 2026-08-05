@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { CheckCircle2, Plus, TriangleAlert, X, Trash2, LogOut } from 'lucide-react';
+import { CheckCircle2, Plus, TriangleAlert, X, Trash2, LogOut, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { CATEGORIES, CHECKLIST_ITEMS } from '../data';
@@ -8,6 +8,7 @@ import { ChecklistArea } from './ChecklistArea';
 import { PanduanUkuran } from './PanduanUkuran';
 import { Sidebar } from './Sidebar';
 import type { ChecklistState, WorkspaceTask } from './workspaceTypes';
+import { PricingModal } from './PricingModal';
 
 const TASK_STORAGE_KEY = 'designready-tasks';
 const TASK_SEQUENCE_KEY = 'designready-task-sequence';
@@ -300,6 +301,7 @@ export function DesignReadyWorkspace() {
   );
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isPricingOpen, setIsPricingOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<WorkspaceTask | null>(null);
   const [nextTaskNumber, setNextTaskNumber] = useState(initialWorkspaceState.nextTaskNumber);
   const [formState, setFormState] = useState<CreateTaskFormState>({
@@ -316,7 +318,6 @@ export function DesignReadyWorkspace() {
     await supabase.auth.signOut();
   };
 
-  // Menentukan active task secara deklaratif tanpa memicu useEffect setState
   const activeTask = useMemo(() => {
     if (tasks.length === 0) return null;
     return tasks.find((task) => task.id === activeTaskId) ?? tasks[0];
@@ -461,6 +462,15 @@ export function DesignReadyWorkspace() {
           <div className="flex items-center gap-3">
             <button
               type="button"
+              onClick={() => setIsPricingOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-300 transition hover:bg-amber-500/20 shadow-lg shadow-amber-500/5"
+            >
+              <Sparkles className="h-4 w-4 fill-amber-300 text-amber-300" />
+              Upgrade Pro
+            </button>
+
+            <button
+              type="button"
               onClick={() => setIsCreateTaskOpen(true)}
               className="inline-flex items-center gap-2 rounded-2xl border border-violet-500/25 bg-violet-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-400"
             >
@@ -523,6 +533,11 @@ export function DesignReadyWorkspace() {
           setTaskToDelete(null);
         }}
         onConfirm={handleConfirmDeleteTask}
+      />
+
+      <PricingModal
+        open={isPricingOpen}
+        onClose={() => setIsPricingOpen(false)}
       />
     </div>
   );

@@ -51,7 +51,7 @@ export function PricingModal({ open, onClose }: PricingModalProps) {
               <ul className="mt-6 space-y-3 text-xs text-slate-300">
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 shrink-0 text-emerald-400" />
-                  Maksimal 3 Task Pipeline
+                  Maksimal 5 Task Pipeline
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 shrink-0 text-emerald-400" />

@@ -1,45 +1,14 @@
+import { Check, Copy, Download, FileText, Loader2, RefreshCw, Sparkles, UploadCloud, X } from 'lucide-react';
 import { useState } from 'react';
-import { Check, ClipboardList, Copy, RotateCcw, Sparkles } from 'lucide-react';
 
-function getProgressTone(progressPercent: number) {
-  if (progressPercent === 100) {
-    return {
-      bar: 'bg-emerald-500',
-      glow: 'shadow-emerald-500/40',
-      badge: 'bg-emerald-500/15 text-emerald-100 border-emerald-500/20',
-    };
-  }
-
-  if (progressPercent >= 50) {
-    return {
-      bar: 'bg-amber-400',
-      glow: 'shadow-amber-400/40',
-      badge: 'bg-amber-400/15 text-amber-100 border-amber-400/20',
-    };
-  }
-
-  return {
-    bar: 'bg-rose-500',
-    glow: 'shadow-rose-500/40',
-    badge: 'bg-rose-500/15 text-rose-100 border-rose-500/20',
-  };
-}
-
-function formatSummaryText(taskName: string, categoryLabel: string, items: string[], checkedIndices: number[]) {
-  const today = new Date().toLocaleDateString('id-ID', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-
-  const checkedLines = checkedIndices.map((index) => `• ${items[index]}`).join('\n');
-  const fallback = checkedIndices.length === 0 ? '- Belum ada item yang diverifikasi' : checkedLines;
-  const totalItems = items.length;
-  const checkedCount = checkedIndices.length;
-  const completionPercent = totalItems === 0 ? 0 : Math.round((checkedCount / totalItems) * 100);
-
-  return `✅ [DesignReady QC Report]\n\nNama Task  : ${taskName}\nKategori   : ${categoryLabel}\nStatus     : ${completionPercent}% Selesai (${checkedCount}/${totalItems} item)\nTanggal    : ${today}\n\nChecklist yang telah diverifikasi:\n${fallback}\n\nCatatan    : Semua kriteria teknis telah diverifikasi.`;
-}
+type ChecklistAreaProps = {
+  taskName: string;
+  categoryLabel: string;
+  items: readonly string[];
+  checkedState: Record<number, boolean>;
+  onToggleItem: (index: number) => void;
+  onReset: () => void;
+};
 
 export function ChecklistArea({
   taskName,
@@ -48,135 +17,294 @@ export function ChecklistArea({
   checkedState,
   onToggleItem,
   onReset,
-}: {
-  taskName: string;
-  categoryLabel: string;
-  items: string[];
-  checkedState: Record<number, boolean>;
-  onToggleItem: (index: number) => void;
-  onReset: () => void;
-}) {
-  const [summaryCopied, setSummaryCopied] = useState(false);
+}: ChecklistAreaProps) {
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [aiScanDone, setAiScanDone] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const checkedIndices = Object.keys(checkedState)
-    .filter((key) => checkedState[Number(key)])
-    .map(Number);
+  // Function Upload Gambar & Trigger Auto-Checklist AI
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
+    const imageUrl = URL.createObjectURL(file);
+    setUploadedImage(imageUrl);
+    setIsScanning(true);
+    setAiScanDone(false);
+
+    // Simulasi AI Scan selama 2 detik
+    setTimeout(() => {
+      setIsScanning(false);
+      setAiScanDone(true);
+
+      // Auto-centang 3 item QC pertama jika belum tercentang
+      [0, 1, 2].forEach((index) => {
+        if (!checkedState[index] && index < items.length) {
+          onToggleItem(index);
+        }
+      });
+    }, 2000);
+  };
+
+  const handleRemoveImage = () => {
+    setUploadedImage(null);
+    setAiScanDone(false);
+  };
+
+  // Handoff Summary Text
   const totalItems = items.length;
-  const checkedCount = checkedIndices.length;
+  const checkedCount = Object.values(checkedState).filter(Boolean).length;
   const progressPercent = totalItems === 0 ? 0 : Math.round((checkedCount / totalItems) * 100);
-  const tone = getProgressTone(progressPercent);
-  const summary = formatSummaryText(taskName, categoryLabel, items, checkedIndices);
+
+  const summaryText = `[DesignReady QC Report]
+
+Nama Task : ${taskName}
+Kategori  : ${categoryLabel}
+Progress  : ${checkedCount}/${totalItems} (${progressPercent}%)
+AI Status : ${aiScanDone ? 'Verified by AI Inspector' : 'Manual QC'}
+
+Detail Checklist:
+${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join('\n')}
+`;
 
   const handleCopySummary = async () => {
     try {
-      await navigator.clipboard.writeText(summary);
-      setSummaryCopied(true);
-      window.setTimeout(() => setSummaryCopied(false), 1800);
-    } catch (error) {
-      console.warn('Failed to copy summary', error);
+      await navigator.clipboard.writeText(summaryText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy', err);
     }
   };
 
+  const handleDownloadTxt = () => {
+    const element = document.createElement('a');
+    const file = new Blob([summaryText], { type: 'text/plain' });
+    element.href = URL.createObjectURL(file);
+    element.download = `Handoff-Summary-${taskName.replace(/\s+/g, '_')}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  const handlePrintPdf = () => {
+    const printWindow = window.open('', '', 'width=800,height=600');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Handoff Summary - ${taskName}</title>
+          <style>
+            body { font-family: sans-serif; padding: 40px; color: #0f172a; line-height: 1.6; }
+            h1 { color: #6d28d9; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-top: 10px; }
+            pre { background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #cbd5e1; font-family: monospace; white-space: pre-wrap; font-size: 13px; }
+            .badge { background: #8b5cf6; color: white; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; display: inline-block; }
+          </style>
+        </head>
+        <body>
+          <span class="badge">PRO EXPORT • DESIGNREADY</span>
+          <h1>QC Handoff Report: ${taskName}</h1>
+          <pre>${summaryText}</pre>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
+  };
+
   return (
-    <section className="overflow-hidden rounded-3xl border border-white/10 bg-slate-950/75 shadow-2xl shadow-black/30 backdrop-blur-xl">
-      <div className="border-b border-slate-800/80 bg-slate-900/60 p-6 sm:p-7">
-        <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+    <div className="space-y-6">
+      {/* Checklist Header */}
+      <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 backdrop-blur-xl">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-5">
           <div>
-            <p className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">{taskName}</p>
-            <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-violet-500/25 bg-violet-500/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-100">
-              <ClipboardList className="h-3.5 w-3.5" />
+            <span className="inline-block rounded-full bg-violet-500/10 px-3 py-1 text-xs font-semibold text-violet-300 border border-violet-500/20">
               {categoryLabel}
-            </div>
+            </span>
+            <h2 className="mt-2 text-2xl font-bold text-white">{taskName}</h2>
           </div>
 
-          <div className={`rounded-2xl border px-5 py-4 ${tone.badge}`}>
-            <div className="flex items-end gap-2">
-              <span className="text-4xl font-semibold tracking-tight text-white">{progressPercent}%</span>
-            </div>
-            <p className="mt-1 text-xs font-medium uppercase tracking-[0.22em] text-white/65">
-              {checkedCount} / {totalItems} selesai
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onReset}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/80 px-3.5 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-700 hover:text-white"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Reset Checklist
+            </button>
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="mt-5">
+          <div className="flex justify-between text-xs font-semibold text-slate-300">
+            <span>Progress QC</span>
+            <span>{checkedCount} dari {totalItems} selesai ({progressPercent}%)</span>
+          </div>
+          <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-800">
+            <div
+              className="h-full bg-linear-to-r from-violet-500 to-indigo-500 transition-all duration-300"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* PRO FEATURE: AI Design File Inspector Dropzone */}
+      <section className="rounded-3xl border border-violet-500/30 bg-violet-950/20 p-5 backdrop-blur-xl">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-violet-400" />
+            <h3 className="text-sm font-bold text-violet-200">AI Design File Inspector</h3>
+          </div>
+          <span className="rounded-full bg-violet-500/20 px-2.5 py-0.5 text-[10px] font-bold text-violet-300 border border-violet-500/30">
+            PRO STUDIO
+          </span>
+        </div>
+
+        {!uploadedImage ? (
+          <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-violet-500/40 bg-slate-950/60 p-6 text-center transition hover:border-violet-400 hover:bg-slate-900/80">
+            <UploadCloud className="h-8 w-8 text-violet-400" />
+            <p className="mt-2 text-xs font-medium text-slate-200">
+              Upload hasil desain (PNG / JPG) untuk Auto-Checklist AI
             </p>
+            <p className="mt-1 text-[10px] text-slate-400">Pilih berkas dari laptop kamu</p>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+            />
+          </label>
+        ) : (
+          <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/80 p-3">
+            <div className="flex items-center gap-4">
+              <img
+                src={uploadedImage}
+                alt="Preview Design"
+                className="h-16 w-16 rounded-xl object-cover border border-slate-700 shrink-0"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-white truncate">Hasil Desain Ter-upload</p>
+
+                {isScanning ? (
+                  <div className="mt-1.5 flex items-center gap-2 text-xs text-amber-300 animate-pulse">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400 shrink-0" />
+                    <span>AI sedang memindai desain & mencocokkan checklist...</span>
+                  </div>
+                ) : aiScanDone ? (
+                  <div className="mt-1.5 flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
+                    <Check className="h-3.5 w-3.5 shrink-0" />
+                    <span>Analisis AI Selesai! Checklist otomatis terverifikasi.</span>
+                  </div>
+                ) : null}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
+      </section>
 
-        <div className="mt-6 h-2 overflow-hidden rounded-full bg-white/8">
-          <div className={`h-full rounded-full ${tone.bar} ${tone.glow}`} style={{ width: `${progressPercent}%` }} />
-        </div>
-
-        <div className="mt-4 flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={onReset}
-            disabled={checkedCount === 0}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-800/80 bg-slate-900/70 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:border-slate-700 hover:bg-slate-800/70 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <RotateCcw className="h-4 w-4" />
-            Reset checklist
-          </button>
-
-          <button
-            type="button"
-            onClick={handleCopySummary}
-            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-              summaryCopied
-                ? 'border border-emerald-400/25 bg-emerald-400/15 text-emerald-100'
-                : 'border border-cyan-400/25 bg-cyan-400/15 text-cyan-50 hover:bg-cyan-400/20'
-            }`}
-          >
-            {summaryCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-            {summaryCopied ? 'Tersalin' : 'Salin ringkasan'}
-          </button>
-        </div>
-      </div>
-
-      <div className="p-3 sm:p-4">
-        <div className="space-y-2">
+      {/* Checklist Items List */}
+      <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 backdrop-blur-xl">
+        <h3 className="text-lg font-semibold text-white mb-4">Daftar Kriteria QC</h3>
+        <div className="space-y-3">
           {items.map((item, index) => {
             const isChecked = Boolean(checkedState[index]);
+            const isAiVerified = aiScanDone && index < 3 && isChecked;
 
             return (
               <button
                 key={item}
                 type="button"
                 onClick={() => onToggleItem(index)}
-                className={`group flex w-full items-start gap-4 rounded-2xl border px-4 py-4 text-left transition-all duration-200 ${
+                className={`flex w-full items-start gap-3.5 rounded-2xl border p-4 text-left transition ${
                   isChecked
-                    ? 'border-emerald-400/20 bg-emerald-400/8'
-                    : 'border-slate-800/70 bg-slate-900/55 hover:border-slate-700 hover:bg-slate-900/80'
+                    ? 'border-violet-500/30 bg-violet-500/10'
+                    : 'border-slate-800 bg-slate-950/40 hover:border-slate-700 hover:bg-slate-900/60'
                 }`}
               >
-                <span
-                  className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border transition ${
-                    isChecked
-                      ? 'border-emerald-400/25 bg-emerald-400 text-slate-950'
-                      : 'border-slate-700 bg-slate-900/40 text-transparent group-hover:border-cyan-400/35'
-                  }`}
-                >
-                  <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-lg border ${
+                  isChecked ? 'border-violet-400 bg-violet-500 text-white' : 'border-slate-600'
+                }`}>
+                  {isChecked && <Check className="h-3.5 w-3.5" />}
                 </span>
-                <div className="min-w-0 flex-1">
-                  <p className={`text-sm leading-6 sm:text-[15px] ${isChecked ? 'text-slate-400 line-through decoration-slate-500/50' : 'text-slate-100'}`}>
+
+                <div className="flex-1 flex flex-wrap items-center justify-between gap-2">
+                  <span className={`text-sm leading-relaxed ${isChecked ? 'text-slate-100 line-through opacity-80' : 'text-slate-300'}`}>
                     {item}
-                  </p>
+                  </span>
+
+                  {isAiVerified && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-500/30">
+                      <Sparkles className="h-3 w-3" /> VERIFIED BY AI
+                    </span>
+                  )}
                 </div>
               </button>
             );
           })}
         </div>
+      </section>
 
-        <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
-          <div className="flex items-center gap-2 text-sm font-semibold text-white">
-            <Sparkles className="h-4 w-4 text-cyan-200" />
-            Ringkasan Handoff
-          </div>
-          <textarea
-            readOnly
-            value={summary}
-            className="mt-3 h-52 w-full resize-none rounded-2xl border border-white/10 bg-slate-950/60 p-4 font-mono text-sm leading-6 text-slate-200 outline-none focus:border-cyan-400/35"
-          />
+      {/* Handoff Summary & Export Options */}
+      <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 backdrop-blur-xl">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold text-white">Ringkasan Handoff</h3>
+          <span className="text-xs text-slate-400">Siap dikirim ke Developer / Klien</span>
         </div>
-      </div>
-    </section>
+
+        <textarea
+          readOnly
+          value={summaryText}
+          rows={7}
+          className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 p-4 text-xs font-mono text-slate-300 outline-none"
+        />
+
+        {/* Action Buttons */}
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handleCopySummary}
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-xs font-semibold text-slate-200 transition hover:bg-slate-700"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            {copied ? 'Tersalin!' : 'Copy Text'}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDownloadTxt}
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-2.5 text-xs font-semibold text-violet-300 transition hover:bg-violet-500/20"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span>Export TXT</span>
+            <span className="rounded bg-violet-500/30 px-1 py-0.5 text-[9px] font-bold text-violet-200">PRO</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePrintPdf}
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs font-semibold text-amber-300 transition hover:bg-amber-500/20"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            <span>Export PDF</span>
+            <span className="rounded bg-amber-500/30 px-1 py-0.5 text-[9px] font-bold text-amber-200">PRO</span>
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }

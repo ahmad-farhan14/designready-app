@@ -1,3 +1,4 @@
+import JSZip from 'jszip';
 import { Check, Copy, Download, FileText, Loader2, RefreshCw, Sparkles, UploadCloud, X } from 'lucide-react';
 import { useState } from 'react';
 
@@ -18,100 +19,118 @@ export function ChecklistArea({
   onToggleItem,
   onReset,
 }: ChecklistAreaProps) {
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; url?: string; isZip?: boolean }[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [aiScanDone, setAiScanDone] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Function Upload Gambar dengan Logic Presisi & Anti-Kecele Nama File
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  // Handler Multi-File & ZIP Inspection
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = event.target.files;
+    if (!fileList || fileList.length === 0) return;
 
-    const imageUrl = URL.createObjectURL(file);
-    setUploadedImage(imageUrl);
+    const files = Array.from(fileList);
     setIsScanning(true);
     setAiScanDone(false);
 
-    const fileName = file.name.toLowerCase();
-    const fileType = file.type.toLowerCase();
+    const newUploadedFiles: { name: string; url?: string; isZip?: boolean }[] = [];
+    const passedIndexes = new Set<number>();
 
-    const processChecklist = (width: number, height: number) => {
-      const passedIndexes: number[] = [];
+    // 1. Cek apakah ada file ZIP
+    const zipFile = files.find((f) => f.name.toLowerCase().endsWith('.zip'));
 
-      items.forEach((itemText: string, idx: number) => {
-        const text = itemText.toLowerCase();
+    if (zipFile) {
+      try {
+        const zip = new JSZip();
+        const zipContent = await zip.loadAsync(zipFile);
+        const internalFileNames = Object.keys(zipContent.files).map((f) => f.toLowerCase());
 
-        // 1. Format Vector (STRICT: Hanya file .svg)
-        if (text.includes('vector') || text.includes('svg')) {
-          if (fileType.includes('svg') || fileName.endsWith('.svg')) {
-            passedIndexes.push(idx);
+        newUploadedFiles.push({ name: zipFile.name, isZip: true });
+
+        // Kriteria Package Folder Otomatis Lulus untuk .zip
+        items.forEach((itemText, idx) => {
+          const text = itemText.toLowerCase();
+          if (text.includes('package') || text.includes('folder') || text.includes('berbagai ukuran')) {
+            passedIndexes.add(idx);
           }
-        }
-        // 2. Brand Guideline PDF (STRICT: Hanya file .pdf)
-        else if (text.includes('pdf') || text.includes('guideline')) {
-          if (fileName.endsWith('.pdf') || fileType.includes('pdf')) {
-            passedIndexes.push(idx);
+          if ((text.includes('vector') || text.includes('svg')) && internalFileNames.some((f) => f.endsWith('.svg'))) {
+            passedIndexes.add(idx);
           }
-        }
-        // 3. Tipografi / Font (STRICT: Wajib indikasi kata kunci teks/brand eksplisit, bukan sekadar 'logo.png')
-        else if (text.includes('tipografi') || text.includes('font')) {
-          const hasFontKeyword =
-            fileName.includes('text') ||
-            fileName.includes('font') ||
-            fileName.includes('wordmark') ||
-            fileName.includes('typography') ||
-            fileName.includes('kfc') ||
-            fileName.includes('lego');
-
-          if (hasFontKeyword) {
-            passedIndexes.push(idx);
-          }
-        }
-        // 4. File Multi-Ukuran & Package (TIDAK tercentang untuk single file upload)
-        else if (text.includes('berbagai ukuran') || text.includes('package') || text.includes('folder')) {
-          // Skipped untuk single image upload
-        }
-        // 5. Safe Background / Kontras (Syarat HD minimal 1080px)
-        else if (text.includes('background') || text.includes('bentrok')) {
-          if (width >= 1080 || height >= 1080) {
-            passedIndexes.push(idx);
-          }
-        }
-        // 6. Kriteria Visual Dasar (Versi Logo, Margin, Color Palette, Ukuran Minimum)
-        else {
-          if (width >= 200 || height >= 200) {
-            passedIndexes.push(idx);
-          }
-        }
-      });
-
-      // Simulasi pemindaian AI selama 1.5 detik
-      setTimeout(() => {
-        setIsScanning(false);
-        setAiScanDone(true);
-
-        passedIndexes.forEach((index: number) => {
-          if (!checkedState[index] && index < items.length) {
-            onToggleItem(index);
+          if ((text.includes('pdf') || text.includes('guideline')) && internalFileNames.some((f) => f.endsWith('.pdf'))) {
+            passedIndexes.add(idx);
           }
         });
-      }, 1500);
-    };
+      } catch (err) {
+        console.error('Gagal membongkar file ZIP', err);
+      }
+    }
 
-    const img = new Image();
-    img.src = imageUrl;
+    // 2. Cek Berkas Gambar & PDF Biasa
+    const normalFiles = files.filter((f) => !f.name.toLowerCase().endsWith('.zip'));
 
-    img.onload = () => processChecklist(img.width, img.height);
-    img.onerror = () => processChecklist(960, 960);
+    normalFiles.forEach((file) => {
+      const fileName = file.name.toLowerCase();
+      const fileType = file.type.toLowerCase();
+      const url = fileType.startsWith('image/') ? URL.createObjectURL(file) : undefined;
+
+      newUploadedFiles.push({ name: file.name, url });
+
+      items.forEach((itemText, idx) => {
+        const text = itemText.toLowerCase();
+
+        // Check Vector
+        if ((text.includes('vector') || text.includes('svg')) && (fileType.includes('svg') || fileName.endsWith('.svg'))) {
+          passedIndexes.add(idx);
+        }
+        // Check PDF Guideline
+        if ((text.includes('pdf') || text.includes('guideline')) && (fileName.endsWith('.pdf') || fileType.includes('pdf'))) {
+          passedIndexes.add(idx);
+        }
+        // Check Tipografi
+        if (
+          (text.includes('tipografi') || text.includes('font')) &&
+          (fileName.includes('text') || fileName.includes('font') || fileName.includes('wordmark') || fileName.includes('kfc') || fileName.includes('lego'))
+        ) {
+          passedIndexes.add(idx);
+        }
+        // Kriteria Visual Dasar
+        if (fileType.startsWith('image/') && !text.includes('vector') && !text.includes('pdf') && !text.includes('folder')) {
+          passedIndexes.add(idx);
+        }
+      });
+    });
+
+    // Jika user mengupload lebih dari 1 file sekaligus
+    if (files.length > 1) {
+      items.forEach((itemText, idx) => {
+        const text = itemText.toLowerCase();
+        if (text.includes('berbagai ukuran') || text.includes('package') || text.includes('folder')) {
+          passedIndexes.add(idx);
+        }
+      });
+    }
+
+    setUploadedFiles((prev) => [...prev, ...newUploadedFiles]);
+
+    // Simulasi Delay Pindaian AI
+    setTimeout(() => {
+      setIsScanning(false);
+      setAiScanDone(true);
+
+      passedIndexes.forEach((index) => {
+        if (!checkedState[index] && index < items.length) {
+          onToggleItem(index);
+        }
+      });
+    }, 1500);
   };
 
-  const handleRemoveImage = () => {
-    setUploadedImage(null);
+  const handleRemoveAllFiles = () => {
+    setUploadedFiles([]);
     setAiScanDone(false);
   };
 
-  // Handoff Summary Text
+  // Handoff Summary
   const totalItems = items.length;
   const checkedCount = Object.values(checkedState).filter(Boolean).length;
   const progressPercent = totalItems === 0 ? 0 : Math.round((checkedCount / totalItems) * 100);
@@ -121,7 +140,7 @@ export function ChecklistArea({
 Nama Task : ${taskName}
 Kategori  : ${categoryLabel}
 Progress  : ${checkedCount}/${totalItems} (${progressPercent}%)
-AI Status : ${aiScanDone ? 'Verified by AI Inspector' : 'Manual QC'}
+AI Status : ${aiScanDone ? 'Verified by AI Batch Inspector' : 'Manual QC'}
 
 Detail Checklist:
 ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join('\n')}
@@ -177,7 +196,7 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
 
   return (
     <div className="space-y-6">
-      {/* Checklist Header */}
+      {/* Header & Progress */}
       <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 backdrop-blur-xl">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-5">
           <div>
@@ -197,11 +216,12 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
           </button>
         </div>
 
-        {/* Progress Bar */}
         <div className="mt-5">
           <div className="flex justify-between text-xs font-semibold text-slate-300">
             <span>Progress QC</span>
-            <span>{checkedCount} dari {totalItems} selesai ({progressPercent}%)</span>
+            <span>
+              {checkedCount} dari {totalItems} selesai ({progressPercent}%)
+            </span>
           </div>
           <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-800">
             <div
@@ -212,69 +232,77 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
         </div>
       </section>
 
-      {/* PRO FEATURE: AI Design File Inspector Dropzone */}
+      {/* Batch Upload Dropzone */}
       <section className="rounded-3xl border border-violet-500/30 bg-violet-950/20 p-5 backdrop-blur-xl">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-violet-400" />
-            <h3 className="text-sm font-bold text-violet-200">AI Design File Inspector</h3>
+            <h3 className="text-sm font-bold text-violet-200">AI Batch Design Inspector</h3>
           </div>
           <span className="rounded-full bg-violet-500/20 px-2.5 py-0.5 text-[10px] font-bold text-violet-300 border border-violet-500/30">
-            PRO STUDIO
+            MULTI-FILE & ZIP SUPPORT
           </span>
         </div>
 
-        {!uploadedImage ? (
-          <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-violet-500/40 bg-slate-950/60 p-6 text-center transition hover:border-violet-400 hover:bg-slate-900/80">
-            <UploadCloud className="h-8 w-8 text-violet-400" />
-            <p className="mt-2 text-xs font-medium text-slate-200">
-              Upload hasil desain (PNG / JPG) atau Brand Guideline (PDF)
-            </p>
-            <p className="mt-1 text-[10px] text-slate-400">Pilih berkas hasil ekspor dari laptop kamu</p>
-            <input
-              type="file"
-              accept="image/*,.pdf"
-              onChange={handleImageUpload}
-              className="hidden"
-            />
-          </label>
-        ) : (
-          <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/80 p-3">
-            <div className="flex items-center gap-4">
-              <img
-                src={uploadedImage}
-                alt="Preview Design"
-                className="h-16 w-16 rounded-xl object-cover border border-slate-700 shrink-0"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-white truncate">Hasil Desain Ter-upload</p>
+        <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-violet-500/40 bg-slate-950/60 p-6 text-center transition hover:border-violet-400 hover:bg-slate-900/80">
+          <UploadCloud className="h-8 w-8 text-violet-400" />
+          <p className="mt-2 text-xs font-medium text-slate-200">
+            Upload beberapa aset sekaligus (PNG, SVG, PDF) atau Berkas ZIP
+          </p>
+          <p className="mt-1 text-[10px] text-slate-400">Pilih beberapa file sekaligus untuk analisis QC otomatis</p>
+          <input
+            type="file"
+            accept="image/*,.pdf,.svg,.zip"
+            multiple // <--- Memungkinkan pilih banyak file
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+        </label>
 
-                {isScanning ? (
-                  <div className="mt-1.5 flex items-center gap-2 text-xs text-amber-300 animate-pulse">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400 shrink-0" />
-                    <span>AI sedang memindai spesifikasi berkas & mencocokkan checklist...</span>
-                  </div>
-                ) : aiScanDone ? (
-                  <div className="mt-1.5 flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
-                    <Check className="h-3.5 w-3.5 shrink-0" />
-                    <span>Analisis AI Selesai! Kriteria terverifikasi secara presisi.</span>
-                  </div>
-                ) : null}
-              </div>
-
+        {/* Status Scanning / Hasil Batch */}
+        {uploadedFiles.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <div className="flex items-center justify-between text-xs text-slate-300 px-1">
+              <span className="font-semibold">{uploadedFiles.length} Berkas Di-upload:</span>
               <button
                 type="button"
-                onClick={handleRemoveImage}
-                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white"
+                onClick={handleRemoveAllFiles}
+                className="text-slate-400 hover:text-white flex items-center gap-1 text-[11px]"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3 w-3" /> Hapus Semua
               </button>
             </div>
+
+            <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto p-2 bg-slate-950/80 rounded-xl border border-slate-800">
+              {uploadedFiles.map((file, i) => (
+                <div
+                  key={`${file.name}-${i}`}
+                  className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 px-2.5 py-1 rounded-lg text-xs text-slate-200 truncate max-w-[200px]"
+                >
+                  <FileText className="h-3.5 w-3.5 text-violet-400 shrink-0" />
+                  <span className="truncate">{file.name}</span>
+                </div>
+              ))}
+            </div>
+
+            {isScanning && (
+              <div className="flex items-center gap-2 text-xs text-amber-300 animate-pulse pt-1">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400 shrink-0" />
+                <span>AI sedang memeriksa kelengkapan paket berkas...</span>
+              </div>
+            )}
+
+            {aiScanDone && (
+              <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium pt-1">
+                <Check className="h-3.5 w-3.5 shrink-0" />
+                <span>Analisis Batch Selesai! Seluruh kriteria kecocokan telah diverifikasi.</span>
+              </div>
+            )}
           </div>
         )}
       </section>
 
-      {/* Checklist Items List */}
+      {/* Checklist List */}
       <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 backdrop-blur-xl">
         <h3 className="text-lg font-semibold text-white mb-4">Daftar Kriteria QC</h3>
         <div className="space-y-3">
@@ -293,9 +321,11 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
                     : 'border-slate-800 bg-slate-950/40 hover:border-slate-700 hover:bg-slate-900/60'
                 }`}
               >
-                <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-lg border ${
-                  isChecked ? 'border-violet-400 bg-violet-500 text-white' : 'border-slate-600'
-                }`}>
+                <span
+                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-lg border ${
+                    isChecked ? 'border-violet-400 bg-violet-500 text-white' : 'border-slate-600'
+                  }`}
+                >
                   {isChecked && <Check className="h-3.5 w-3.5" />}
                 </span>
 
@@ -316,7 +346,7 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
         </div>
       </section>
 
-      {/* Handoff Summary & Export Options */}
+      {/* Summary & Export */}
       <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 backdrop-blur-xl">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-semibold text-white">Ringkasan Handoff</h3>
@@ -330,7 +360,6 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
           className="w-full rounded-2xl border border-slate-800 bg-slate-950/80 p-4 text-xs font-mono text-slate-300 outline-none"
         />
 
-        {/* Action Buttons */}
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
             type="button"

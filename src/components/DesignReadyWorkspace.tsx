@@ -331,9 +331,15 @@ export function DesignReadyWorkspace() {
   const initialWorkspaceState = loadWorkspaceState();
 
   const [tasks, setTasks] = useState<WorkspaceTask[]>(initialWorkspaceState.tasks);
-  const [activeTaskId, setActiveTaskId] = useState<string | null>(
-    initialWorkspaceState.tasks[0]?.id ?? null,
-  );
+
+  // Read activeTaskId from localStorage on initial render
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(() => {
+    const savedActiveId = window.localStorage.getItem('designready-active-task-id');
+    const exists = initialWorkspaceState.tasks.some((task) => task.id === savedActiveId);
+    if (savedActiveId && exists) return savedActiveId;
+    return initialWorkspaceState.tasks[0]?.id ?? null;
+  });
+
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isPricingOpen, setIsPricingOpen] = useState(false);
@@ -344,10 +350,20 @@ export function DesignReadyWorkspace() {
     categoryKey: 'ui-ux',
   });
 
+  // Persist tasks and nextTaskNumber to localStorage
   useEffect(() => {
     window.localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify(tasks));
     window.localStorage.setItem(TASK_SEQUENCE_KEY, String(nextTaskNumber));
   }, [nextTaskNumber, tasks]);
+
+  // Persist activeTaskId to localStorage whenever it changes
+  useEffect(() => {
+    if (activeTaskId) {
+      window.localStorage.setItem('designready-active-task-id', activeTaskId);
+    } else {
+      window.localStorage.removeItem('designready-active-task-id');
+    }
+  }, [activeTaskId]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -537,6 +553,7 @@ export function DesignReadyWorkspace() {
 
           {activeTask ? (
             <ChecklistArea
+              taskId={activeTask.id}
               taskName={activeTask.name}
               categoryLabel={getCategoryLabel(activeTask.categoryKey)}
               items={CHECKLIST_ITEMS[activeTask.categoryKey]}

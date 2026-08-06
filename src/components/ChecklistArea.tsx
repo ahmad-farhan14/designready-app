@@ -1,8 +1,10 @@
 import JSZip from 'jszip';
 import { Check, Copy, Download, FileText, Loader2, RefreshCw, Sparkles, UploadCloud, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { clearFilesFromDB, getFilesFromDB, saveFilesToDB } from '../utils/fileStorage';
 
 type ChecklistAreaProps = {
+  taskId: string;
   taskName: string;
   categoryLabel: string;
   items: readonly string[];
@@ -12,6 +14,7 @@ type ChecklistAreaProps = {
 };
 
 export function ChecklistArea({
+  taskId,
   taskName,
   categoryLabel,
   items,
@@ -24,6 +27,34 @@ export function ChecklistArea({
   const [aiScanDone, setAiScanDone] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // Load simpanan file dari IndexedDB saat komponen pertama kali dipasang atau ganti task
+  useEffect(() => {
+    let active = true;
+    async function loadSavedFiles() {
+      try {
+        const saved = await getFilesFromDB(taskId);
+        if (saved && saved.length > 0 && active) {
+          const restoredFiles = saved.map((f) => {
+            const blob = new Blob([f.data], { type: f.type });
+            const url = f.type.startsWith('image/') ? URL.createObjectURL(blob) : undefined;
+            return { name: f.name, url, isZip: f.isZip };
+          });
+          setUploadedFiles(restoredFiles);
+          setAiScanDone(true);
+        } else if (active) {
+          setUploadedFiles([]);
+          setAiScanDone(false);
+        }
+      } catch (err) {
+        console.error('Gagal memuat simpanan berkas', err);
+      }
+    }
+    loadSavedFiles();
+    return () => {
+      active = false;
+    };
+  }, [taskId]);
+
   // Handler Multi-File, Social Media Assets & ZIP Inspection
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = event.target.files;
@@ -32,6 +63,9 @@ export function ChecklistArea({
     const files = Array.from(fileList);
     setIsScanning(true);
     setAiScanDone(false);
+
+    // Simpan file asli ke IndexedDB agar tetap tersimpan saat refresh
+    await saveFilesToDB(taskId, files);
 
     const newUploadedFiles: { name: string; url?: string; isZip?: boolean }[] = [];
     const passedIndexes = new Set<number>();
@@ -113,7 +147,6 @@ export function ChecklistArea({
         }
 
         // --- MEDIA SOSIAL SPECIFIC RULES ---
-        // Format Ekspor Tepat (JPG/PNG/MP4/WEBP)
         if (text.includes('format') || text.includes('jpg/png/mp4')) {
           if (
             fileType.includes('png') ||
@@ -130,21 +163,18 @@ export function ChecklistArea({
           }
         }
 
-        // Resolusi 72dpi / Teks Terbaca / Warna Brand Visual
         if (fileType.startsWith('image/')) {
           if (text.includes('72dpi') || text.includes('terbaca') || text.includes('warna')) {
             passedIndexes.add(idx);
           }
         }
 
-        // Logo & Watermark
         if (text.includes('watermark') || text.includes('logo & watermark')) {
           if (fileName.includes('logo') || fileName.includes('watermark')) {
             passedIndexes.add(idx);
           }
         }
 
-        // Caption & Hashtag
         if (text.includes('caption') || text.includes('hashtag')) {
           if (
             fileName.includes('caption') ||
@@ -159,7 +189,7 @@ export function ChecklistArea({
       });
     });
 
-    // 3. Aturan Batch Multi-File & ZIP (Otomatis Meloloskan Kriteria Konsistensi, Dimensi, Safe Zone, & Package)
+    // 3. Aturan Batch Multi-File & ZIP
     if (files.length > 1 || zipFile) {
       items.forEach((itemText, idx) => {
         const text = itemText.toLowerCase();
@@ -178,7 +208,6 @@ export function ChecklistArea({
 
     setUploadedFiles((prev) => [...prev, ...newUploadedFiles]);
 
-    // Simulasi Delay Pindaian AI 1.5 detik
     setTimeout(() => {
       setIsScanning(false);
       setAiScanDone(true);
@@ -191,9 +220,17 @@ export function ChecklistArea({
     }, 1500);
   };
 
-  const handleRemoveAllFiles = () => {
+  const handleRemoveAllFiles = async () => {
+    await clearFilesFromDB(taskId);
     setUploadedFiles([]);
     setAiScanDone(false);
+  };
+
+  const handleResetWithClear = async () => {
+    await clearFilesFromDB(taskId);
+    setUploadedFiles([]);
+    setAiScanDone(false);
+    onReset();
   };
 
   // Handoff Summary
@@ -274,7 +311,7 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
 
           <button
             type="button"
-            onClick={onReset}
+            onClick={handleResetWithClear}
             className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/80 px-3.5 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-700 hover:text-white"
           >
             <RefreshCw className="h-3.5 w-3.5" />

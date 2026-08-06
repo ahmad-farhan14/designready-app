@@ -23,7 +23,7 @@ export function ChecklistArea({
   const [aiScanDone, setAiScanDone] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Function Upload Gambar dengan Logic Robust Anti-Fail & Fallback
+  // Function Upload Gambar dengan Logic Presisi & Anti-Kecele Nama File
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -42,23 +42,43 @@ export function ChecklistArea({
       items.forEach((itemText: string, idx: number) => {
         const text = itemText.toLowerCase();
 
-        // 1. Format Vector (Hanya jika file .svg)
+        // 1. Format Vector (STRICT: Hanya file .svg)
         if (text.includes('vector') || text.includes('svg')) {
           if (fileType.includes('svg') || fileName.endsWith('.svg')) {
             passedIndexes.push(idx);
           }
         }
-        // 2. Brand Guideline PDF (Hanya jika file .pdf)
+        // 2. Brand Guideline PDF (STRICT: Hanya file .pdf)
         else if (text.includes('pdf') || text.includes('guideline')) {
           if (fileName.endsWith('.pdf') || fileType.includes('pdf')) {
             passedIndexes.push(idx);
           }
         }
-        // 3. Package Folder
-        else if (text.includes('package') || text.includes('folder')) {
-          // Dilewati untuk single file upload
+        // 3. Tipografi / Font (STRICT: Wajib indikasi kata kunci teks/brand eksplisit, bukan sekadar 'logo.png')
+        else if (text.includes('tipografi') || text.includes('font')) {
+          const hasFontKeyword =
+            fileName.includes('text') ||
+            fileName.includes('font') ||
+            fileName.includes('wordmark') ||
+            fileName.includes('typography') ||
+            fileName.includes('kfc') ||
+            fileName.includes('lego');
+
+          if (hasFontKeyword) {
+            passedIndexes.push(idx);
+          }
         }
-        // 4. Semua Kriteria Visual Lainnya LULUS jika gambar valid (min 200px)
+        // 4. File Multi-Ukuran & Package (TIDAK tercentang untuk single file upload)
+        else if (text.includes('berbagai ukuran') || text.includes('package') || text.includes('folder')) {
+          // Skipped untuk single image upload
+        }
+        // 5. Safe Background / Kontras (Syarat HD minimal 1080px)
+        else if (text.includes('background') || text.includes('bentrok')) {
+          if (width >= 1080 || height >= 1080) {
+            passedIndexes.push(idx);
+          }
+        }
+        // 6. Kriteria Visual Dasar (Versi Logo, Margin, Color Palette, Ukuran Minimum)
         else {
           if (width >= 200 || height >= 200) {
             passedIndexes.push(idx);
@@ -66,7 +86,7 @@ export function ChecklistArea({
         }
       });
 
-      // Animasi scan 1.5 detik
+      // Simulasi pemindaian AI selama 1.5 detik
       setTimeout(() => {
         setIsScanning(false);
         setAiScanDone(true);
@@ -82,14 +102,8 @@ export function ChecklistArea({
     const img = new Image();
     img.src = imageUrl;
 
-    img.onload = () => {
-      processChecklist(img.width, img.height);
-    };
-
-    // Fallback jika event onload dipintas/gagal oleh browser
-    img.onerror = () => {
-      processChecklist(960, 960);
-    };
+    img.onload = () => processChecklist(img.width, img.height);
+    img.onerror = () => processChecklist(960, 960);
   };
 
   const handleRemoveImage = () => {

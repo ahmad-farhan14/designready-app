@@ -55,7 +55,7 @@ export function PricingModal({ open, onClose }: PricingModalProps) {
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 shrink-0 text-emerald-400" />
-                  Kategori Standard (UI/UX, Social, Branding)
+                  Checklist QC Manual (UI/UX, Social, Branding)
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 shrink-0 text-emerald-400" />
@@ -99,23 +99,23 @@ export function PricingModal({ open, onClose }: PricingModalProps) {
               <ul className="mt-6 space-y-3 text-xs text-slate-200">
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 shrink-0 text-violet-400" />
+                  <strong>AI Design Inspector</strong> (Upload PNG/JPG)
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 shrink-0 text-violet-400" />
+                  <strong>Automated QC Checklist Verification</strong>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 shrink-0 text-violet-400" />
                   <strong>Unlimited</strong> Task Pipeline
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 shrink-0 text-violet-400" />
-                  Export Handoff Summary (PDF & JSON)
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-violet-400" />
-                  Custom Checklist Items Template
+                  Export Handoff Summary (PDF & TXT)
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 shrink-0 text-violet-400" />
                   Cloud Sync via Supabase Database
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-violet-400" />
-                  Priority Email Support
                 </li>
               </ul>
             </div>
@@ -151,19 +151,19 @@ export function PricingModal({ open, onClose }: PricingModalProps) {
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 shrink-0 text-sky-400" />
+                  <strong>Brand Guidelines AI Inspector</strong> (Upload PDF)
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 shrink-0 text-sky-400" />
+                  Cross-Validation Desain vs Brand Rules
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-4 w-4 shrink-0 text-sky-400" />
                   <strong>Multi-User / Team Workspace</strong>
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 shrink-0 text-sky-400" />
-                  Role Access Control (Admin, QC Inspector, Designer)
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-sky-400" />
                   Custom Branding Logo di Export Summary
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-sky-400" />
-                  Dedicated Account Manager & SLA 99.9%
                 </li>
               </ul>
             </div>

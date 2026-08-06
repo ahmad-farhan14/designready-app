@@ -13,6 +13,27 @@ type ChecklistAreaProps = {
   onReset: () => void;
 };
 
+// Helper untuk membaca dimensi gambar (Width & Height) secara async
+function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
+  return new Promise((resolve) => {
+    if (!file.type.startsWith('image/')) {
+      resolve({ width: 0, height: 0 });
+      return;
+    }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      URL.revokeObjectURL(url);
+    };
+    img.onerror = () => {
+      resolve({ width: 0, height: 0 });
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  });
+}
+
 export function ChecklistArea({
   taskId,
   taskName,
@@ -27,7 +48,6 @@ export function ChecklistArea({
   const [aiScanDone, setAiScanDone] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Load simpanan file dari IndexedDB saat komponen pertama kali dipasang atau ganti task
   useEffect(() => {
     let active = true;
     async function loadSavedFiles() {
@@ -55,7 +75,6 @@ export function ChecklistArea({
     };
   }, [taskId]);
 
-  // Handler Multi-File, Social Media Assets & ZIP Inspection
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = event.target.files;
     if (!fileList || fileList.length === 0) return;
@@ -64,16 +83,36 @@ export function ChecklistArea({
     setIsScanning(true);
     setAiScanDone(false);
 
-    // Simpan file asli ke IndexedDB agar tetap tersimpan saat refresh
     await saveFilesToDB(taskId, files);
 
     const newUploadedFiles: { name: string; url?: string; isZip?: boolean }[] = [];
     const passedIndexes = new Set<number>();
 
-    // 1. Cek apakah ada file ZIP
+    // Bendera & Data Analisis Berkas
+    let hasVector = false;
+    let hasPdf = false;
+    let hasFont = false;
+    let hasTextDoc = false;
+    let hasTransparentImage = false; // PNG / SVG
+    let hasZip = false;
+
+    // Analisis Ukuran & Dimensi Piksel Realistis
+    const imageMetaPromises = files.map(async (f) => {
+      const dims = await getImageDimensions(f);
+      return { file: f, dims };
+    });
+    const analyzedFiles = await Promise.all(imageMetaPromises);
+
+    const totalFiles = files.length;
+    const validImages = analyzedFiles.filter((af) => af.dims.width > 0);
+    const hasHighResImage = validImages.some((af) => af.dims.width >= 1000 || af.dims.height >= 1000);
+    const hasMultipleDimensions = new Set(validImages.map((af) => `${af.dims.width}x${af.dims.height}`)).size > 1;
+
+    // 1. Cek Berkas ZIP
     const zipFile = files.find((f) => f.name.toLowerCase().endsWith('.zip'));
 
     if (zipFile) {
+      hasZip = true;
       try {
         const zip = new JSZip();
         const zipContent = await zip.loadAsync(zipFile);
@@ -81,38 +120,28 @@ export function ChecklistArea({
 
         newUploadedFiles.push({ name: zipFile.name, isZip: true });
 
-        // Kriteria Package / Batch / Folder / Konsistensi
-        items.forEach((itemText, idx) => {
-          const text = itemText.toLowerCase();
-          if (
-            text.includes('package') ||
-            text.includes('folder') ||
-            text.includes('berbagai ukuran') ||
-            text.includes('konsistensi') ||
-            text.includes('dimensi') ||
-            text.includes('safe zone')
-          ) {
-            passedIndexes.add(idx);
-          }
-          if ((text.includes('vector') || text.includes('svg')) && internalFileNames.some((f) => f.endsWith('.svg'))) {
-            passedIndexes.add(idx);
-          }
-          if ((text.includes('pdf') || text.includes('guideline')) && internalFileNames.some((f) => f.endsWith('.pdf'))) {
-            passedIndexes.add(idx);
-          }
-          if (
-            (text.includes('caption') || text.includes('hashtag')) &&
-            internalFileNames.some((f) => f.endsWith('.txt') || f.endsWith('.pdf') || f.includes('caption'))
-          ) {
-            passedIndexes.add(idx);
-          }
-        });
+        if (internalFileNames.some((f) => f.endsWith('.svg') || f.endsWith('.ai') || f.endsWith('.eps'))) {
+          hasVector = true;
+          hasTransparentImage = true;
+        }
+        if (internalFileNames.some((f) => f.endsWith('.pdf'))) {
+          hasPdf = true;
+        }
+        if (internalFileNames.some((f) => f.endsWith('.ttf') || f.endsWith('.otf') || f.endsWith('.woff') || f.endsWith('.woff2'))) {
+          hasFont = true;
+        }
+        if (internalFileNames.some((f) => f.endsWith('.txt') || f.endsWith('.doc') || f.endsWith('.docx') || f.includes('caption'))) {
+          hasTextDoc = true;
+        }
+        if (internalFileNames.some((f) => f.endsWith('.png'))) {
+          hasTransparentImage = true;
+        }
       } catch (err) {
         console.error('Gagal membongkar file ZIP', err);
       }
     }
 
-    // 2. Cek Berkas Gambar, PDF, Video, & Teks Biasa
+    // 2. Cek Berkas Normal (Ekstensi & MIME)
     const normalFiles = files.filter((f) => !f.name.toLowerCase().endsWith('.zip'));
 
     normalFiles.forEach((file) => {
@@ -122,89 +151,121 @@ export function ChecklistArea({
 
       newUploadedFiles.push({ name: file.name, url });
 
-      items.forEach((itemText, idx) => {
-        const text = itemText.toLowerCase();
-
-        // --- BRANDING & LOGO RULES ---
-        if ((text.includes('vector') || text.includes('svg')) && (fileType.includes('svg') || fileName.endsWith('.svg'))) {
-          passedIndexes.add(idx);
-        }
-        if ((text.includes('pdf') || text.includes('guideline')) && (fileName.endsWith('.pdf') || fileType.includes('pdf'))) {
-          passedIndexes.add(idx);
-        }
-
-        // --- TIPOGRAFI / FONT / EMBED / OUTLINE ---
-        if (
-          (text.includes('tipografi') || text.includes('font') || text.includes('embed') || text.includes('outline')) &&
-          (fileName.includes('text') ||
-            fileName.includes('font') ||
-            fileName.includes('wordmark') ||
-            fileName.includes('typography') ||
-            fileName.includes('embed') ||
-            fileName.includes('outline'))
-        ) {
-          passedIndexes.add(idx);
-        }
-
-        // --- MEDIA SOSIAL SPECIFIC RULES ---
-        if (text.includes('format') || text.includes('jpg/png/mp4')) {
-          if (
-            fileType.includes('png') ||
-            fileType.includes('jpeg') ||
-            fileType.includes('jpg') ||
-            fileType.includes('mp4') ||
-            fileType.includes('webp') ||
-            fileName.endsWith('.mp4') ||
-            fileName.endsWith('.png') ||
-            fileName.endsWith('.jpg') ||
-            fileName.endsWith('.jpeg')
-          ) {
-            passedIndexes.add(idx);
-          }
-        }
-
-        if (fileType.startsWith('image/')) {
-          if (text.includes('72dpi') || text.includes('terbaca') || text.includes('warna')) {
-            passedIndexes.add(idx);
-          }
-        }
-
-        if (text.includes('watermark') || text.includes('logo & watermark')) {
-          if (fileName.includes('logo') || fileName.includes('watermark')) {
-            passedIndexes.add(idx);
-          }
-        }
-
-        if (text.includes('caption') || text.includes('hashtag')) {
-          if (
-            fileName.includes('caption') ||
-            fileName.includes('hashtag') ||
-            fileName.includes('text') ||
-            fileName.endsWith('.txt') ||
-            fileName.endsWith('.pdf')
-          ) {
-            passedIndexes.add(idx);
-          }
-        }
-      });
+      if (fileType.includes('svg') || fileName.endsWith('.svg') || fileName.endsWith('.ai') || fileName.endsWith('.eps')) {
+        hasVector = true;
+        hasTransparentImage = true;
+      }
+      if (fileName.endsWith('.pdf') || fileType.includes('pdf')) {
+        hasPdf = true;
+      }
+      if (fileName.endsWith('.ttf') || fileName.endsWith('.otf') || fileName.endsWith('.woff') || fileName.endsWith('.woff2') || fileName.includes('font')) {
+        hasFont = true;
+      }
+      if (fileName.endsWith('.txt') || fileName.endsWith('.doc') || fileName.endsWith('.docx') || fileName.includes('caption') || fileName.includes('hashtag')) {
+        hasTextDoc = true;
+      }
+      if (fileType.includes('png') || fileName.endsWith('.png') || fileType.includes('svg')) {
+        hasTransparentImage = true;
+      }
     });
 
-    // 3. Aturan Batch Multi-File & ZIP
-    if (files.length > 1 || zipFile) {
-      items.forEach((itemText, idx) => {
-        const text = itemText.toLowerCase();
-        if (
-          text.includes('berbagai ukuran') ||
-          text.includes('package') ||
-          text.includes('folder') ||
-          text.includes('konsistensi') ||
-          text.includes('dimensi') ||
-          text.includes('safe zone')
-        ) {
+    const isBatch = totalFiles > 1 || hasZip;
+
+    // 3. Evaluasi Ketat & Spesifik (Tanpa Asal Centang)
+    items.forEach((itemText, idx) => {
+      const text = itemText.toLowerCase();
+
+      // --- BRANDING & LOGO RULES ---
+
+      // 1. Vector: Hanya jika ada file Vektor asli (.svg/.ai/.eps)
+      if (text.includes('vector') || text.includes('svg') || text.includes('eps')) {
+        if (hasVector) passedIndexes.add(idx);
+      } 
+      
+      // 2. Versi Logo (Monochrome/Reversed): Butuh minimal 2 file ATAU file transparan + vektor
+      else if (text.includes('versi logo') || text.includes('monochrome') || text.includes('reversed')) {
+        if ((totalFiles >= 2 && (hasTransparentImage || hasVector)) || hasZip) {
           passedIndexes.add(idx);
         }
-      });
-    }
+      } 
+      
+      // 3. Clear space/margin: Butuh PDF Guideline ATAU gambar beresolusi tinggi (min. 1000px)
+      else if (text.includes('clear space') || text.includes('margin')) {
+        if (hasPdf || hasHighResImage || hasVector) {
+          passedIndexes.add(idx);
+        }
+      } 
+      
+      // 4. Ukuran minimum: Butuh PDF Guideline ATAU Vektor (Vektor bebas resolusi)
+      else if (text.includes('ukuran minimum')) {
+        if (hasPdf || hasVector) {
+          passedIndexes.add(idx);
+        }
+      } 
+      
+      // 5. Palette Warna: Butuh PDF Guideline, Dokumen Kode Teks, atau Vektor
+      else if (text.includes('color palette') || text.includes('hex') || text.includes('rgb') || text.includes('cmyk')) {
+        if (hasPdf || hasTextDoc || hasVector) {
+          passedIndexes.add(idx);
+        }
+      } 
+      
+      // 6. Tipografi/Font: Butuh file font asli (.ttf/.otf) ATAU PDF Guideline
+      else if (text.includes('tipografi') || text.includes('font')) {
+        if (hasFont || hasPdf) {
+          passedIndexes.add(idx);
+        }
+      } 
+      
+      // 7. Background tidak bentrok: WAJIB punya transparansi (PNG/SVG) atau PDF Guideline
+      else if (text.includes('background') || text.includes('bentrok')) {
+        if (hasTransparentImage || hasVector || hasPdf) {
+          passedIndexes.add(idx);
+        }
+      } 
+      
+      // 8. Berbagai ukuran: WAJIB punya variasi dimensi piksel beda ATAU Vektor ATAU ZIP
+      else if (text.includes('berbagai ukuran')) {
+        if (hasMultipleDimensions || hasVector || hasZip) {
+          passedIndexes.add(idx);
+        }
+      } 
+      
+      // 9. Brand guideline PDF: WAJIB ada file .pdf
+      else if (text.includes('brand guideline pdf')) {
+        if (hasPdf) {
+          passedIndexes.add(idx);
+        }
+      } 
+      
+      // 10. Package dalam satu folder: WAJIB di-upload sebagai .zip atau Batch Upload
+      else if (text.includes('package') || text.includes('folder') || text.includes('satu folder')) {
+        if (isBatch) {
+          passedIndexes.add(idx);
+        }
+      }
+
+      // --- ASET MEDIA SOSIAL RULES ---
+      else if (text.includes('dimensi') || text.includes('spesifikasi platform')) {
+        if (hasHighResImage || isBatch) passedIndexes.add(idx);
+      } else if (text.includes('72 dpi') || text.includes('72dpi') || text.includes('resolusi minimum')) {
+        if (validImages.length > 0) passedIndexes.add(idx);
+      } else if (text.includes('format file sesuai') || text.includes('jpg/png/mp4')) {
+        if (validImages.length > 0 || isBatch) passedIndexes.add(idx);
+      } else if (text.includes('teks pada gambar') || text.includes('terbaca jelas')) {
+        if (hasHighResImage) passedIndexes.add(idx);
+      } else if (text.includes('safe zone')) {
+        if (hasHighResImage || isBatch) passedIndexes.add(idx);
+      } else if (text.includes('konsistensi elemen visual') || text.includes('konsistensi')) {
+        if (isBatch) passedIndexes.add(idx);
+      } else if (text.includes('caption') || text.includes('hashtag')) {
+        if (hasTextDoc || hasPdf) passedIndexes.add(idx);
+      } else if (text.includes('watermark') || text.includes('logo & watermark')) {
+        if (hasTransparentImage || isBatch) passedIndexes.add(idx);
+      } else if (text.includes('dikelompokkan rapi') || text.includes('kampanye')) {
+        if (isBatch) passedIndexes.add(idx);
+      }
+    });
 
     setUploadedFiles((prev) => [...prev, ...newUploadedFiles]);
 
@@ -355,7 +416,7 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
           <p className="mt-1 text-[10px] text-slate-400">Pilih beberapa file sekaligus untuk analisis QC otomatis</p>
           <input
             type="file"
-            accept="image/*,video/*,.pdf,.svg,.zip,.txt"
+            accept="image/*,video/*,.pdf,.svg,.zip,.txt,.ttf,.otf,.woff,.woff2,.doc,.docx"
             multiple
             onChange={handleFileUpload}
             className="hidden"

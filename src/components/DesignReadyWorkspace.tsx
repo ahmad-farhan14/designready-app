@@ -105,21 +105,28 @@ function getCategoryLabel(categoryKey: CategoryKey) {
 function CreateTaskModal({
   open,
   formState,
+  taskCount,
   onChange,
   onClose,
   onSubmit,
+  onOpenPricing,
 }: {
   open: boolean;
   formState: CreateTaskFormState;
+  taskCount: number;
   onChange: (nextState: CreateTaskFormState) => void;
   onClose: () => void;
   onSubmit: () => void;
+  onOpenPricing: () => void;
 }) {
   if (!open) {
     return null;
   }
 
-  const isSubmitDisabled = formState.name.trim().length === 0;
+  // Set limit ke 5 task untuk paket Free
+  const FREE_TASK_LIMIT = 5;
+  const isLimitReached = taskCount >= FREE_TASK_LIMIT;
+  const isSubmitDisabled = formState.name.trim().length === 0 || isLimitReached;
 
   return (
     <div className="modal-overlay-fade fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm">
@@ -142,16 +149,43 @@ function CreateTaskModal({
         </div>
 
         <div className="space-y-5 px-6 py-5">
+          {/* Banner Peringatan jika Limit 5 Task Tercapai */}
+          {isLimitReached && (
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-200">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 shrink-0 text-amber-400" />
+                  <span>
+                    Batas paket <strong>Starter (Maks. 5 Task)</strong> telah tercapai.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenPricing();
+                  }}
+                  className="shrink-0 rounded-xl bg-amber-500 px-3 py-1.5 font-semibold text-slate-950 transition hover:bg-amber-400"
+                >
+                  Upgrade Pro
+                </button>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="text-sm font-semibold text-slate-100">Nama Task *</label>
             <input
               autoFocus
+              disabled={isLimitReached}
               value={formState.name}
               onChange={(event) => onChange({ ...formState, name: event.target.value })}
-              placeholder="cth: Desain Logo Perusahaan X"
-              className="mt-2 w-full rounded-2xl border border-violet-500/35 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none ring-0 placeholder:text-slate-500 focus:border-violet-400"
+              placeholder={isLimitReached ? "Batas task tercapai..." : "cth: Desain Logo Perusahaan X"}
+              className="mt-2 w-full rounded-2xl border border-violet-500/35 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none ring-0 placeholder:text-slate-500 focus:border-violet-400 disabled:cursor-not-allowed disabled:opacity-50"
             />
-            <p className="mt-2 text-xs text-slate-400">Nama task wajib diisi.</p>
+            <p className="mt-2 text-xs text-slate-400">
+              {isLimitReached ? "Hapus task lama atau upgrade ke Pro untuk menambah task." : "Nama task wajib diisi."}
+            </p>
           </div>
 
           <div>
@@ -164,8 +198,9 @@ function CreateTaskModal({
                   <button
                     key={category.key}
                     type="button"
+                    disabled={isLimitReached}
                     onClick={() => onChange({ ...formState, categoryKey: category.key })}
-                    className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                    className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
                       isSelected
                         ? 'border-violet-400/45 bg-violet-500/12'
                         : 'border-slate-800/80 bg-slate-950/50 hover:border-slate-700 hover:bg-slate-900/75'
@@ -520,9 +555,11 @@ export function DesignReadyWorkspace() {
       <CreateTaskModal
         open={isCreateTaskOpen}
         formState={formState}
+        taskCount={tasks.length}
         onChange={setFormState}
         onClose={() => setIsCreateTaskOpen(false)}
         onSubmit={handleCreateTask}
+        onOpenPricing={() => setIsPricingOpen(true)}
       />
 
       <DeleteTaskModal

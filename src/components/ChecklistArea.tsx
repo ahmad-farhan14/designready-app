@@ -54,7 +54,9 @@ export function ChecklistArea({
             text.includes('package') ||
             text.includes('folder') ||
             text.includes('berbagai ukuran') ||
-            text.includes('konsistensi')
+            text.includes('konsistensi') ||
+            text.includes('dimensi') ||
+            text.includes('safe zone')
           ) {
             passedIndexes.add(idx);
           }
@@ -129,15 +131,15 @@ export function ChecklistArea({
         }
 
         // Resolusi 72dpi / Teks Terbaca / Warna Brand Visual
-        if (text.includes('72dpi') || text.includes('terbaca') || text.includes('warna')) {
-          if (fileType.startsWith('image/') || fileType.startsWith('video/')) {
+        if (fileType.startsWith('image/')) {
+          if (text.includes('72dpi') || text.includes('terbaca') || text.includes('warna')) {
             passedIndexes.add(idx);
           }
         }
 
         // Logo & Watermark
         if (text.includes('watermark') || text.includes('logo & watermark')) {
-          if (fileName.includes('logo') || fileName.includes('watermark') || files.length > 1) {
+          if (fileName.includes('logo') || fileName.includes('watermark')) {
             passedIndexes.add(idx);
           }
         }
@@ -151,13 +153,6 @@ export function ChecklistArea({
             fileName.endsWith('.txt') ||
             fileName.endsWith('.pdf')
           ) {
-            passedIndexes.add(idx);
-          }
-        }
-
-        // Visual Umum
-        if (fileType.startsWith('image/') && !text.includes('vector') && !text.includes('pdf') && !text.includes('folder')) {
-          if (!text.includes('caption') && !text.includes('embed')) {
             passedIndexes.add(idx);
           }
         }

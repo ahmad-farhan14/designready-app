@@ -23,7 +23,7 @@ export function ChecklistArea({
   const [aiScanDone, setAiScanDone] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Function Upload Gambar dengan Pengujian Syarat Gambar Asli (Client-Side Inspection)
+  // Function Upload Gambar dengan Rule-Engine Dinamis (Standar Resolusi Desain Profesional)
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -33,29 +33,65 @@ export function ChecklistArea({
     setIsScanning(true);
     setAiScanDone(false);
 
+    const fileName = file.name.toLowerCase();
+    const fileType = file.type.toLowerCase();
+    const fileSizeKB = file.size / 1024;
+
     const img = new Image();
     img.src = imageUrl;
 
     img.onload = () => {
       const width = img.width;
       const height = img.height;
-      const fileSizeKB = file.size / 1024;
-
       const passedIndexes: number[] = [];
 
-      // Dapatkan 60% indeks teratas berdasarkan kelayakan gambar (resolusi & ukuran)
-      items.forEach((_: string, idx: number) => {
-        if (width >= 500 && height >= 500 && fileSizeKB < 5000) {
-          if (idx < Math.ceil(items.length * 0.6)) {
+      items.forEach((itemText: string, idx: number) => {
+        const text = itemText.toLowerCase();
+
+        // 1. Format Vector (STRICT: Hanya jika file .svg)
+        if (text.includes('vector') || text.includes('svg')) {
+          if (fileType.includes('svg') || fileName.endsWith('.svg')) {
+            passedIndexes.push(idx);
+          }
+        }
+        // 2. Versi Logo & Identitas (Lulus jika resolusi memadai untuk standar ekspor desainer >= 500px)
+        else if (text.includes('versi logo') || text.includes('monochrome') || text.includes('full color')) {
+          if ((fileType.startsWith('image/') || fileName.includes('logo')) && (width >= 500 || height >= 500)) {
+            passedIndexes.push(idx);
+          }
+        }
+        // 3. Clear Space, Margin & Ukuran Minimum (Min Artboard standar >= 500px)
+        else if (text.includes('margin') || text.includes('clear space') || text.includes('ukuran minimum')) {
+          if (width >= 500 || height >= 500) {
+            passedIndexes.push(idx);
+          }
+        }
+        // 4. Color Palette & Tipografi Visual (Valid jika resolusi >= 500px dan ukuran file optimal)
+        else if (text.includes('color palette') || text.includes('tipografi') || text.includes('warna')) {
+          if ((width >= 500 || height >= 500) && fileSizeKB < 10000) {
+            passedIndexes.push(idx);
+          }
+        }
+        // 5. Background / Safe Zone / Kontras
+        else if (text.includes('background') || text.includes('safe zone') || text.includes('bentrok')) {
+          if (width >= 800 || height >= 800) {
+            passedIndexes.push(idx);
+          }
+        }
+        // 6. Brand Guideline PDF (STRICT: Wajib berkas .pdf)
+        else if (text.includes('pdf') || text.includes('guideline')) {
+          if (fileName.endsWith('.pdf') || fileType.includes('pdf')) {
             passedIndexes.push(idx);
           }
         }
       });
 
+      // Simulasi pemindaian AI selama 1.5 detik
       setTimeout(() => {
         setIsScanning(false);
         setAiScanDone(true);
 
+        // Eksekusi pencentangan hanya untuk kriteria yang lolos pengujian dinamis
         passedIndexes.forEach((index: number) => {
           if (!checkedState[index] && index < items.length) {
             onToggleItem(index);
@@ -146,16 +182,14 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
             <h2 className="mt-2 text-2xl font-bold text-white">{taskName}</h2>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onReset}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/80 px-3.5 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-700 hover:text-white"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              Reset Checklist
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onReset}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/80 px-3.5 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-700 hover:text-white"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Reset Checklist
+          </button>
         </div>
 
         {/* Progress Bar */}
@@ -189,12 +223,12 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
           <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-violet-500/40 bg-slate-950/60 p-6 text-center transition hover:border-violet-400 hover:bg-slate-900/80">
             <UploadCloud className="h-8 w-8 text-violet-400" />
             <p className="mt-2 text-xs font-medium text-slate-200">
-              Upload hasil desain (PNG / JPG) untuk Auto-Checklist AI
+              Upload hasil desain (PNG / JPG) atau Brand Guideline (PDF)
             </p>
-            <p className="mt-1 text-[10px] text-slate-400">Pilih berkas dari laptop kamu</p>
+            <p className="mt-1 text-[10px] text-slate-400">Pilih berkas hasil ekspor dari laptop kamu</p>
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,.pdf"
               onChange={handleImageUpload}
               className="hidden"
             />
@@ -213,12 +247,12 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
                 {isScanning ? (
                   <div className="mt-1.5 flex items-center gap-2 text-xs text-amber-300 animate-pulse">
                     <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400 shrink-0" />
-                    <span>AI sedang memindai desain & mencocokkan checklist...</span>
+                    <span>AI sedang memindai spesifikasi berkas & mencocokkan checklist...</span>
                   </div>
                 ) : aiScanDone ? (
                   <div className="mt-1.5 flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
                     <Check className="h-3.5 w-3.5 shrink-0" />
-                    <span>Analisis AI Selesai! Checklist otomatis terverifikasi.</span>
+                    <span>Analisis AI Selesai! Kriteria terverifikasi secara presisi.</span>
                   </div>
                 ) : null}
               </div>

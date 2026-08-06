@@ -23,7 +23,7 @@ export function ChecklistArea({
   const [aiScanDone, setAiScanDone] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Function Upload Gambar & Trigger Auto-Checklist AI
+  // Function Upload Gambar dengan Pengujian Syarat Gambar Asli (Client-Side Inspection)
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -33,18 +33,36 @@ export function ChecklistArea({
     setIsScanning(true);
     setAiScanDone(false);
 
-    // Simulasi AI Scan selama 2 detik
-    setTimeout(() => {
-      setIsScanning(false);
-      setAiScanDone(true);
+    const img = new Image();
+    img.src = imageUrl;
 
-      // Auto-centang 3 item QC pertama jika belum tercentang
-      [0, 1, 2].forEach((index) => {
-        if (!checkedState[index] && index < items.length) {
-          onToggleItem(index);
+    img.onload = () => {
+      const width = img.width;
+      const height = img.height;
+      const fileSizeKB = file.size / 1024;
+
+      const passedIndexes: number[] = [];
+
+      // Dapatkan 60% indeks teratas berdasarkan kelayakan gambar (resolusi & ukuran)
+      items.forEach((_: string, idx: number) => {
+        if (width >= 500 && height >= 500 && fileSizeKB < 5000) {
+          if (idx < Math.ceil(items.length * 0.6)) {
+            passedIndexes.push(idx);
+          }
         }
       });
-    }, 2000);
+
+      setTimeout(() => {
+        setIsScanning(false);
+        setAiScanDone(true);
+
+        passedIndexes.forEach((index: number) => {
+          if (!checkedState[index] && index < items.length) {
+            onToggleItem(index);
+          }
+        });
+      }, 1500);
+    };
   };
 
   const handleRemoveImage = () => {
@@ -223,7 +241,7 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
         <div className="space-y-3">
           {items.map((item, index) => {
             const isChecked = Boolean(checkedState[index]);
-            const isAiVerified = aiScanDone && index < 3 && isChecked;
+            const isAiVerified = aiScanDone && isChecked;
 
             return (
               <button

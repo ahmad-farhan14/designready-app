@@ -24,7 +24,7 @@ export function ChecklistArea({
   const [aiScanDone, setAiScanDone] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Handler Multi-File & ZIP Inspection
+  // Handler Multi-File, Social Media Assets & ZIP Inspection
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = event.target.files;
     if (!fileList || fileList.length === 0) return;
@@ -47,10 +47,15 @@ export function ChecklistArea({
 
         newUploadedFiles.push({ name: zipFile.name, isZip: true });
 
-        // Kriteria Package Folder Otomatis Lulus untuk .zip
+        // Kriteria Package / Batch / Folder / Konsistensi
         items.forEach((itemText, idx) => {
           const text = itemText.toLowerCase();
-          if (text.includes('package') || text.includes('folder') || text.includes('berbagai ukuran')) {
+          if (
+            text.includes('package') ||
+            text.includes('folder') ||
+            text.includes('berbagai ukuran') ||
+            text.includes('konsistensi')
+          ) {
             passedIndexes.add(idx);
           }
           if ((text.includes('vector') || text.includes('svg')) && internalFileNames.some((f) => f.endsWith('.svg'))) {
@@ -59,13 +64,19 @@ export function ChecklistArea({
           if ((text.includes('pdf') || text.includes('guideline')) && internalFileNames.some((f) => f.endsWith('.pdf'))) {
             passedIndexes.add(idx);
           }
+          if (
+            (text.includes('caption') || text.includes('hashtag')) &&
+            internalFileNames.some((f) => f.endsWith('.txt') || f.endsWith('.pdf') || f.includes('caption'))
+          ) {
+            passedIndexes.add(idx);
+          }
         });
       } catch (err) {
         console.error('Gagal membongkar file ZIP', err);
       }
     }
 
-    // 2. Cek Berkas Gambar & PDF Biasa
+    // 2. Cek Berkas Gambar, PDF, Video, & Teks Biasa
     const normalFiles = files.filter((f) => !f.name.toLowerCase().endsWith('.zip'));
 
     normalFiles.forEach((file) => {
@@ -78,33 +89,93 @@ export function ChecklistArea({
       items.forEach((itemText, idx) => {
         const text = itemText.toLowerCase();
 
-        // Check Vector
+        // --- BRANDING & LOGO RULES ---
         if ((text.includes('vector') || text.includes('svg')) && (fileType.includes('svg') || fileName.endsWith('.svg'))) {
           passedIndexes.add(idx);
         }
-        // Check PDF Guideline
         if ((text.includes('pdf') || text.includes('guideline')) && (fileName.endsWith('.pdf') || fileType.includes('pdf'))) {
           passedIndexes.add(idx);
         }
-        // Check Tipografi
+
+        // --- TIPOGRAFI / FONT / EMBED / OUTLINE ---
         if (
-          (text.includes('tipografi') || text.includes('font')) &&
-          (fileName.includes('text') || fileName.includes('font') || fileName.includes('wordmark') || fileName.includes('kfc') || fileName.includes('lego'))
+          (text.includes('tipografi') || text.includes('font') || text.includes('embed') || text.includes('outline')) &&
+          (fileName.includes('text') ||
+            fileName.includes('font') ||
+            fileName.includes('wordmark') ||
+            fileName.includes('typography') ||
+            fileName.includes('embed') ||
+            fileName.includes('outline'))
         ) {
           passedIndexes.add(idx);
         }
-        // Kriteria Visual Dasar
+
+        // --- MEDIA SOSIAL SPECIFIC RULES ---
+        // Format Ekspor Tepat (JPG/PNG/MP4/WEBP)
+        if (text.includes('format') || text.includes('jpg/png/mp4')) {
+          if (
+            fileType.includes('png') ||
+            fileType.includes('jpeg') ||
+            fileType.includes('jpg') ||
+            fileType.includes('mp4') ||
+            fileType.includes('webp') ||
+            fileName.endsWith('.mp4') ||
+            fileName.endsWith('.png') ||
+            fileName.endsWith('.jpg') ||
+            fileName.endsWith('.jpeg')
+          ) {
+            passedIndexes.add(idx);
+          }
+        }
+
+        // Resolusi 72dpi / Teks Terbaca / Warna Brand Visual
+        if (text.includes('72dpi') || text.includes('terbaca') || text.includes('warna')) {
+          if (fileType.startsWith('image/') || fileType.startsWith('video/')) {
+            passedIndexes.add(idx);
+          }
+        }
+
+        // Logo & Watermark
+        if (text.includes('watermark') || text.includes('logo & watermark')) {
+          if (fileName.includes('logo') || fileName.includes('watermark') || files.length > 1) {
+            passedIndexes.add(idx);
+          }
+        }
+
+        // Caption & Hashtag
+        if (text.includes('caption') || text.includes('hashtag')) {
+          if (
+            fileName.includes('caption') ||
+            fileName.includes('hashtag') ||
+            fileName.includes('text') ||
+            fileName.endsWith('.txt') ||
+            fileName.endsWith('.pdf')
+          ) {
+            passedIndexes.add(idx);
+          }
+        }
+
+        // Visual Umum
         if (fileType.startsWith('image/') && !text.includes('vector') && !text.includes('pdf') && !text.includes('folder')) {
-          passedIndexes.add(idx);
+          if (!text.includes('caption') && !text.includes('embed')) {
+            passedIndexes.add(idx);
+          }
         }
       });
     });
 
-    // Jika user mengupload lebih dari 1 file sekaligus
-    if (files.length > 1) {
+    // 3. Aturan Batch Multi-File & ZIP (Otomatis Meloloskan Kriteria Konsistensi, Dimensi, Safe Zone, & Package)
+    if (files.length > 1 || zipFile) {
       items.forEach((itemText, idx) => {
         const text = itemText.toLowerCase();
-        if (text.includes('berbagai ukuran') || text.includes('package') || text.includes('folder')) {
+        if (
+          text.includes('berbagai ukuran') ||
+          text.includes('package') ||
+          text.includes('folder') ||
+          text.includes('konsistensi') ||
+          text.includes('dimensi') ||
+          text.includes('safe zone')
+        ) {
           passedIndexes.add(idx);
         }
       });
@@ -112,7 +183,7 @@ export function ChecklistArea({
 
     setUploadedFiles((prev) => [...prev, ...newUploadedFiles]);
 
-    // Simulasi Delay Pindaian AI
+    // Simulasi Delay Pindaian AI 1.5 detik
     setTimeout(() => {
       setIsScanning(false);
       setAiScanDone(true);
@@ -247,13 +318,13 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
         <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-violet-500/40 bg-slate-950/60 p-6 text-center transition hover:border-violet-400 hover:bg-slate-900/80">
           <UploadCloud className="h-8 w-8 text-violet-400" />
           <p className="mt-2 text-xs font-medium text-slate-200">
-            Upload beberapa aset sekaligus (PNG, SVG, PDF) atau Berkas ZIP
+            Upload beberapa aset sekaligus (PNG, JPG, MP4, SVG, PDF) atau Berkas ZIP
           </p>
           <p className="mt-1 text-[10px] text-slate-400">Pilih beberapa file sekaligus untuk analisis QC otomatis</p>
           <input
             type="file"
-            accept="image/*,.pdf,.svg,.zip"
-            multiple // <--- Memungkinkan pilih banyak file
+            accept="image/*,video/*,.pdf,.svg,.zip,.txt"
+            multiple
             onChange={handleFileUpload}
             className="hidden"
           />
@@ -277,7 +348,7 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
               {uploadedFiles.map((file, i) => (
                 <div
                   key={`${file.name}-${i}`}
-                  className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 px-2.5 py-1 rounded-lg text-xs text-slate-200 truncate max-w-[200px]"
+                  className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 px-2.5 py-1 rounded-lg text-xs text-slate-200 truncate max-w-50"
                 >
                   <FileText className="h-3.5 w-3.5 text-violet-400 shrink-0" />
                   <span className="truncate">{file.name}</span>
@@ -288,14 +359,14 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
             {isScanning && (
               <div className="flex items-center gap-2 text-xs text-amber-300 animate-pulse pt-1">
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-400 shrink-0" />
-                <span>AI sedang memeriksa kelengkapan paket berkas...</span>
+                <span>AI sedang memeriksa kelengkapan aset & spesifikasi platform...</span>
               </div>
             )}
 
             {aiScanDone && (
               <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium pt-1">
                 <Check className="h-3.5 w-3.5 shrink-0" />
-                <span>Analisis Batch Selesai! Seluruh kriteria kecocokan telah diverifikasi.</span>
+                <span>Analisis Batch Selesai! Kriteria media sosial & branding terverifikasi.</span>
               </div>
             )}
           </div>

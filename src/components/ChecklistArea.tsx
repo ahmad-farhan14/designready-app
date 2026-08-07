@@ -203,14 +203,12 @@ export function ChecklistArea({
       // KATEGORI 1: UI/UX HANDOFF
       // ==========================================
       if (text.includes('layer & komponen') || text.includes('diberi nama')) {
-        // Hanya tercentang jika ada file .fig asli atau .zip (Gambar JPG/PNG tidak boleh lolos)
         if (hasZip || normalFiles.some((f) => f.name.toLowerCase().includes('.fig'))) passedIndexes.add(idx);
       } else if (text.includes('spacing & grid') || text.includes('8pt grid')) {
         if (hasHighResImage || hasPdf || hasVector) passedIndexes.add(idx);
       } else if (text.includes('typografi menggunakan style')) {
         if (hasFont || hasPdf || hasTextDoc) passedIndexes.add(idx);
       } else if (text.includes('color variables') || text.includes('variables/styles')) {
-        // Hanya tercentang jika ada dokumen PDF, TXT, atau ZIP
         if (hasPdf || hasTextDoc || hasZip) passedIndexes.add(idx);
       } else if (text.includes('diekspor dalam resolusi') || text.includes('semua aset diekspor')) {
         if (hasHighResImage || hasVector || isBatch) passedIndexes.add(idx);
@@ -248,7 +246,6 @@ export function ChecklistArea({
       } else if (text.includes('konsistensi visual antar postingan')) {
         if (isBatch || hasZip) passedIndexes.add(idx);
       } else if (text.includes('caption & hashtag')) {
-        // Hanya tercentang jika ADA FILE DOKUMEN TEKS/PDF/ZIP (Gambar tidak boleh lolos)
         if (hasTextDoc || hasPdf || hasZip) passedIndexes.add(idx);
       }
 
@@ -438,23 +435,29 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
         <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-4 text-xs text-slate-300">
           <div className="flex items-center gap-1.5 font-semibold text-violet-300 mb-1.5">
             <HelpCircle className="h-4 w-4 text-violet-400 shrink-0" />
-            <span>Petunjuk Agar Tercentang 100% (Batch Upload):</span>
+            <span>Panduan Format Berkas Handoff (Agar Terverifikasi 100%):</span>
           </div>
-          <p className="text-[11px] leading-relaxed text-slate-400">
-            Upload gambar saja hanya memverifikasi kriteria visual dasar. Untuk meloloskan kriteria teknis penuh, sertakan berkas pendukung:
+          <p className="text-[11px] leading-relaxed text-slate-400 mb-2">
+            Upload 1 gambar JPG/PNG biasa hanya memverifikasi kriteria visual dasar. Untuk mencapai skor QC penuh, pilih beberapa file sekaligus (Batch Upload) atau gunakan format berikut:
           </p>
-          <ul className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-slate-300">
-            <li className="bg-slate-900/90 border border-slate-800 p-2 rounded-xl">
-              <strong className="text-violet-300 block mb-0.5">1. Branding & Logo:</strong>
-              Lampirkan file Vektor (<code className="text-amber-300">.svg</code>), Font (<code className="text-amber-300">.ttf</code>), dan Guideline (<code className="text-amber-300">.pdf</code>).
+          <ul className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-slate-300">
+            <li className="bg-slate-900/90 border border-slate-800 p-2.5 rounded-xl space-y-1">
+              <strong className="text-violet-300 block font-semibold">🎨 Logo & Branding:</strong>
+              <p className="text-slate-400 leading-normal">
+                Sertakan Master Vektor (<code className="text-amber-300 font-mono">.svg/.ai</code>), Font (<code className="text-amber-300 font-mono">.ttf/.otf</code>), Kode Warna (<code className="text-amber-300 font-mono">.txt</code>), dan Panduan (<code className="text-amber-300 font-mono">.pdf</code>).
+              </p>
             </li>
-            <li className="bg-slate-900/90 border border-slate-800 p-2 rounded-xl">
-              <strong className="text-violet-300 block mb-0.5">2. Media Sosial:</strong>
-              Lampirkan dokumen Caption & Hashtag (<code className="text-amber-300">.txt</code> / <code className="text-amber-300">.doc</code>).
+            <li className="bg-slate-900/90 border border-slate-800 p-2.5 rounded-xl space-y-1">
+              <strong className="text-violet-300 block font-semibold">📱 Media Sosial:</strong>
+              <p className="text-slate-400 leading-normal">
+                Sertakan minimal 2 gambar poster/video (<code className="text-amber-300 font-mono">.png/.jpg/.mp4</code>) + File Teks Caption & Hashtag (<code className="text-amber-300 font-mono">.txt/.doc</code>).
+              </p>
             </li>
-            <li className="bg-slate-900/90 border border-slate-800 p-2 rounded-xl">
-              <strong className="text-violet-300 block mb-0.5">3. UI/UX Design:</strong>
-              Lampirkan master file Figma (<code className="text-amber-300">.fig</code>) atau dibungkus dalam <code className="text-amber-300">.zip</code>.
+            <li className="bg-slate-900/90 border border-slate-800 p-2.5 rounded-xl space-y-1">
+              <strong className="text-violet-300 block font-semibold">💻 UI/UX Handoff:</strong>
+              <p className="text-slate-400 leading-normal">
+                Sertakan gambar UI multi-layar (<code className="text-amber-300 font-mono">.png</code>) + File Figma (<code className="text-amber-300 font-mono">.fig</code>) atau Arsip Terkompresi (<code className="text-amber-300 font-mono">.zip</code>).
+              </p>
             </li>
           </ul>
         </div>

@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { Check, Copy, Download, FileText, Loader2, RefreshCw, Sparkles, UploadCloud, X } from 'lucide-react';
+import { Check, Copy, Download, FileText, FolderArchive, Image as ImageIcon, Loader2, RefreshCw, Sparkles, UploadCloud, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { clearFilesFromDB, getFilesFromDB, saveFilesToDB } from '../utils/fileStorage';
 
@@ -13,7 +13,15 @@ type ChecklistAreaProps = {
   onReset: () => void;
 };
 
-// Helper untuk membaca dimensi gambar (Width & Height) secara async
+type FilePreviewItem = {
+  name: string;
+  url?: string;
+  isZip?: boolean;
+  isPdf?: boolean;
+  isVector?: boolean;
+};
+
+// Helper async untuk membaca dimensi piksel (Width & Height)
 function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
   return new Promise((resolve) => {
     if (!file.type.startsWith('image/')) {
@@ -43,7 +51,7 @@ export function ChecklistArea({
   onToggleItem,
   onReset,
 }: ChecklistAreaProps) {
-  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; url?: string; isZip?: boolean }[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<FilePreviewItem[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [aiScanDone, setAiScanDone] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -54,10 +62,17 @@ export function ChecklistArea({
       try {
         const saved = await getFilesFromDB(taskId);
         if (saved && saved.length > 0 && active) {
-          const restoredFiles = saved.map((f) => {
+          const restoredFiles: FilePreviewItem[] = saved.map((f) => {
             const blob = new Blob([f.data], { type: f.type });
-            const url = f.type.startsWith('image/') ? URL.createObjectURL(blob) : undefined;
-            return { name: f.name, url, isZip: f.isZip };
+            const isImg = f.type.startsWith('image/') || f.name.match(/\.(png|jpg|jpeg|webp|jfif|gif)$/i);
+            const url = isImg ? URL.createObjectURL(blob) : undefined;
+            return {
+              name: f.name,
+              url,
+              isZip: f.isZip || f.name.endsWith('.zip'),
+              isPdf: f.type.includes('pdf') || f.name.endsWith('.pdf'),
+              isVector: f.type.includes('svg') || f.name.endsWith('.svg'),
+            };
           });
           setUploadedFiles(restoredFiles);
           setAiScanDone(true);
@@ -85,18 +100,18 @@ export function ChecklistArea({
 
     await saveFilesToDB(taskId, files);
 
-    const newUploadedFiles: { name: string; url?: string; isZip?: boolean }[] = [];
+    const newUploadedFiles: FilePreviewItem[] = [];
     const passedIndexes = new Set<number>();
 
-    // Bendera & Data Analisis Berkas
+    // Bendera & Metadata Berkas
     let hasVector = false;
     let hasPdf = false;
     let hasFont = false;
     let hasTextDoc = false;
-    let hasTransparentImage = false; // PNG / SVG
+    let hasTransparentImage = false;
     let hasZip = false;
 
-    // Analisis Ukuran & Dimensi Piksel Realistis
+    // Analisis Dimensi Piksel Realistis
     const imageMetaPromises = files.map(async (f) => {
       const dims = await getImageDimensions(f);
       return { file: f, dims };
@@ -130,7 +145,7 @@ export function ChecklistArea({
         if (internalFileNames.some((f) => f.endsWith('.ttf') || f.endsWith('.otf') || f.endsWith('.woff') || f.endsWith('.woff2'))) {
           hasFont = true;
         }
-        if (internalFileNames.some((f) => f.endsWith('.txt') || f.endsWith('.doc') || f.endsWith('.docx') || f.includes('caption'))) {
+        if (internalFileNames.some((f) => f.endsWith('.txt') || f.endsWith('.doc') || f.endsWith('.docx') || f.includes('caption') || f.includes('hashtag') || f.includes('notes'))) {
           hasTextDoc = true;
         }
         if (internalFileNames.some((f) => f.endsWith('.png'))) {
@@ -147,123 +162,116 @@ export function ChecklistArea({
     normalFiles.forEach((file) => {
       const fileName = file.name.toLowerCase();
       const fileType = file.type.toLowerCase();
-      const url = fileType.startsWith('image/') ? URL.createObjectURL(file) : undefined;
+      const isImg = fileType.startsWith('image/') || fileName.match(/\.(png|jpg|jpeg|webp|jfif|gif)$/i);
+      const url = isImg ? URL.createObjectURL(file) : undefined;
 
-      newUploadedFiles.push({ name: file.name, url });
+      const isSvg = fileType.includes('svg') || fileName.endsWith('.svg');
+      const isPdfFile = fileName.endsWith('.pdf') || fileType.includes('pdf');
 
-      if (fileType.includes('svg') || fileName.endsWith('.svg') || fileName.endsWith('.ai') || fileName.endsWith('.eps')) {
+      newUploadedFiles.push({
+        name: file.name,
+        url,
+        isPdf: isPdfFile,
+        isVector: isSvg || fileName.endsWith('.ai') || fileName.endsWith('.eps'),
+      });
+
+      if (isSvg || fileName.endsWith('.ai') || fileName.endsWith('.eps')) {
         hasVector = true;
         hasTransparentImage = true;
       }
-      if (fileName.endsWith('.pdf') || fileType.includes('pdf')) {
+      if (isPdfFile) {
         hasPdf = true;
       }
-      if (fileName.endsWith('.ttf') || fileName.endsWith('.otf') || fileName.endsWith('.woff') || fileName.endsWith('.woff2') || fileName.includes('font')) {
+      if (fileName.endsWith('.ttf') || fileName.endsWith('.otf') || fileName.endsWith('.woff') || fileName.endsWith('.woff2') || fileName.includes('font') || fileName.includes('embed') || fileName.includes('outline')) {
         hasFont = true;
       }
-      if (fileName.endsWith('.txt') || fileName.endsWith('.doc') || fileName.endsWith('.docx') || fileName.includes('caption') || fileName.includes('hashtag')) {
+      if (fileName.endsWith('.txt') || fileName.endsWith('.doc') || fileName.endsWith('.docx') || fileName.includes('caption') || fileName.includes('hashtag') || fileName.includes('notes') || fileName.includes('specs')) {
         hasTextDoc = true;
       }
-      if (fileType.includes('png') || fileName.endsWith('.png') || fileType.includes('svg')) {
+      if (fileType.includes('png') || fileName.endsWith('.png') || isSvg) {
         hasTransparentImage = true;
       }
     });
 
     const isBatch = totalFiles > 1 || hasZip;
 
-    // 3. Evaluasi Ketat & Spesifik (Tanpa Asal Centang)
+    // 3. Matriks Rule Engine Presisi Sesuai Daftar QC Kamu
     items.forEach((itemText, idx) => {
       const text = itemText.toLowerCase();
 
-      // --- BRANDING & LOGO RULES ---
-
-      // 1. Vector: Hanya jika ada file Vektor asli (.svg/.ai/.eps)
-      if (text.includes('vector') || text.includes('svg') || text.includes('eps')) {
-        if (hasVector) passedIndexes.add(idx);
-      } 
-      
-      // 2. Versi Logo (Monochrome/Reversed): Butuh minimal 2 file ATAU file transparan + vektor
-      else if (text.includes('versi logo') || text.includes('monochrome') || text.includes('reversed')) {
-        if ((totalFiles >= 2 && (hasTransparentImage || hasVector)) || hasZip) {
-          passedIndexes.add(idx);
-        }
-      } 
-      
-      // 3. Clear space/margin: Butuh PDF Guideline ATAU gambar beresolusi tinggi (min. 1000px)
-      else if (text.includes('clear space') || text.includes('margin')) {
-        if (hasPdf || hasHighResImage || hasVector) {
-          passedIndexes.add(idx);
-        }
-      } 
-      
-      // 4. Ukuran minimum: Butuh PDF Guideline ATAU Vektor (Vektor bebas resolusi)
-      else if (text.includes('ukuran minimum')) {
-        if (hasPdf || hasVector) {
-          passedIndexes.add(idx);
-        }
-      } 
-      
-      // 5. Palette Warna: Butuh PDF Guideline, Dokumen Kode Teks, atau Vektor
-      else if (text.includes('color palette') || text.includes('hex') || text.includes('rgb') || text.includes('cmyk')) {
-        if (hasPdf || hasTextDoc || hasVector) {
-          passedIndexes.add(idx);
-        }
-      } 
-      
-      // 6. Tipografi/Font: Butuh file font asli (.ttf/.otf) ATAU PDF Guideline
-      else if (text.includes('tipografi') || text.includes('font')) {
-        if (hasFont || hasPdf) {
-          passedIndexes.add(idx);
-        }
-      } 
-      
-      // 7. Background tidak bentrok: WAJIB punya transparansi (PNG/SVG) atau PDF Guideline
-      else if (text.includes('background') || text.includes('bentrok')) {
-        if (hasTransparentImage || hasVector || hasPdf) {
-          passedIndexes.add(idx);
-        }
-      } 
-      
-      // 8. Berbagai ukuran: WAJIB punya variasi dimensi piksel beda ATAU Vektor ATAU ZIP
-      else if (text.includes('berbagai ukuran')) {
-        if (hasMultipleDimensions || hasVector || hasZip) {
-          passedIndexes.add(idx);
-        }
-      } 
-      
-      // 9. Brand guideline PDF: WAJIB ada file .pdf
-      else if (text.includes('brand guideline pdf')) {
-        if (hasPdf) {
-          passedIndexes.add(idx);
-        }
-      } 
-      
-      // 10. Package dalam satu folder: WAJIB di-upload sebagai .zip atau Batch Upload
-      else if (text.includes('package') || text.includes('folder') || text.includes('satu folder')) {
-        if (isBatch) {
-          passedIndexes.add(idx);
-        }
+      // ==========================================
+      // KATEGORI 1: UI/UX HANDOFF
+      // ==========================================
+      if (text.includes('layer & komponen') || text.includes('diberi nama')) {
+        if (isBatch || hasZip || normalFiles.some((f) => f.name.toLowerCase().includes('.fig'))) passedIndexes.add(idx);
+      } else if (text.includes('spacing & grid') || text.includes('8pt grid')) {
+        if (hasHighResImage || hasPdf || hasVector) passedIndexes.add(idx);
+      } else if (text.includes('typografi menggunakan style')) {
+        if (hasFont || hasPdf || hasTextDoc) passedIndexes.add(idx);
+      } else if (text.includes('color variables') || text.includes('variables/styles')) {
+        if (hasPdf || hasTextDoc || hasVector || validImages.length > 0) passedIndexes.add(idx);
+      } else if (text.includes('diekspor dalam resolusi') || text.includes('semua aset diekspor')) {
+        if (hasHighResImage || hasVector || isBatch) passedIndexes.add(idx);
+      } else if (text.includes('prototype flow') || text.includes('sudah dihubungkan')) {
+        if (isBatch || validImages.length >= 2 || hasZip) passedIndexes.add(idx);
+      } else if (text.includes('artboard/frame') || text.includes('ukuran artboard')) {
+        if (validImages.length > 0 || hasVector) passedIndexes.add(idx);
+      } else if (text.includes('catatan & anotasi') || text.includes('anotasi')) {
+        if (hasTextDoc || hasPdf || normalFiles.some((f) => f.name.toLowerCase().includes('notes') || f.name.toLowerCase().includes('anotasi'))) passedIndexes.add(idx);
+      } else if (text.includes('organize per section') || text.includes('section/flow')) {
+        if (isBatch || hasZip) passedIndexes.add(idx);
+      } else if (text.includes('share ke stakeholder') || text.includes('stakeholder')) {
+        if (isBatch || hasZip || hasPdf) passedIndexes.add(idx);
       }
 
-      // --- ASET MEDIA SOSIAL RULES ---
-      else if (text.includes('dimensi') || text.includes('spesifikasi platform')) {
+      // ==========================================
+      // KATEGORI 2: ASET MEDIA SOSIAL
+      // ==========================================
+      else if (text.includes('dimensi sesuai platform') || text.includes('feed, story, reel')) {
+        if (validImages.length > 0 || hasHighResImage || isBatch) passedIndexes.add(idx);
+      } else if (text.includes('safe zone konten')) {
         if (hasHighResImage || isBatch) passedIndexes.add(idx);
-      } else if (text.includes('72 dpi') || text.includes('72dpi') || text.includes('resolusi minimum')) {
+      } else if (text.includes('font sudah diembed') || text.includes('di-outline')) {
+        if (hasFont || hasVector || hasPdf) passedIndexes.add(idx);
+      } else if (text.includes('warna sudah sesuai brand guideline')) {
+        if (hasPdf || hasVector || validImages.length > 0 || hasTextDoc) passedIndexes.add(idx);
+      } else if (text.includes('resolusi minimal 72dpi')) {
         if (validImages.length > 0) passedIndexes.add(idx);
-      } else if (text.includes('format file sesuai') || text.includes('jpg/png/mp4')) {
+      } else if (text.includes('format yang tepat (jpg/png/mp4)')) {
         if (validImages.length > 0 || isBatch) passedIndexes.add(idx);
-      } else if (text.includes('teks pada gambar') || text.includes('terbaca jelas')) {
-        if (hasHighResImage) passedIndexes.add(idx);
-      } else if (text.includes('safe zone')) {
-        if (hasHighResImage || isBatch) passedIndexes.add(idx);
-      } else if (text.includes('konsistensi elemen visual') || text.includes('konsistensi')) {
-        if (isBatch) passedIndexes.add(idx);
-      } else if (text.includes('caption') || text.includes('hashtag')) {
-        if (hasTextDoc || hasPdf) passedIndexes.add(idx);
-      } else if (text.includes('watermark') || text.includes('logo & watermark')) {
+      } else if (text.includes('teks terbaca di semua ukuran layar')) {
+        if (hasHighResImage || hasVector) passedIndexes.add(idx);
+      } else if (text.includes('logo & watermark sudah ditambahkan')) {
         if (hasTransparentImage || isBatch) passedIndexes.add(idx);
-      } else if (text.includes('dikelompokkan rapi') || text.includes('kampanye')) {
-        if (isBatch) passedIndexes.add(idx);
+      } else if (text.includes('konsistensi visual antar postingan')) {
+        if (isBatch || hasZip) passedIndexes.add(idx);
+      } else if (text.includes('caption & hashtag')) {
+        if (hasTextDoc || hasPdf || isBatch) passedIndexes.add(idx);
+      }
+
+      // ==========================================
+      // KATEGORI 3: LOGO & BRANDING
+      // ==========================================
+      else if (text.includes('format vector') || text.includes('svg/ai/eps')) {
+        if (hasVector) passedIndexes.add(idx);
+      } else if (text.includes('full color, monochrome, reversed')) {
+        if ((totalFiles >= 2 && (hasTransparentImage || hasVector)) || hasZip) passedIndexes.add(idx);
+      } else if (text.includes('clear space/margin logo')) {
+        if (hasPdf || hasHighResImage || hasVector) passedIndexes.add(idx);
+      } else if (text.includes('ukuran minimum logo')) {
+        if (hasPdf || hasVector) passedIndexes.add(idx);
+      } else if (text.includes('brand color palette') || text.includes('hex/rgb/cmyk')) {
+        if (hasPdf || hasTextDoc || hasVector) passedIndexes.add(idx);
+      } else if (text.includes('tipografi brand sudah ditentukan')) {
+        if (hasFont || hasPdf) passedIndexes.add(idx);
+      } else if (text.includes('background yang bentrok')) {
+        if (hasTransparentImage || hasVector || hasPdf) passedIndexes.add(idx);
+      } else if (text.includes('berbagai ukuran') || text.includes('file logo tersedia')) {
+        if (hasMultipleDimensions || hasVector || hasZip) passedIndexes.add(idx);
+      } else if (text.includes('brand guideline pdf')) {
+        if (hasPdf) passedIndexes.add(idx);
+      } else if (text.includes('package dalam satu folder') || text.includes('semua aset di-package')) {
+        if (isBatch || hasZip) passedIndexes.add(idx);
       }
     });
 
@@ -294,7 +302,7 @@ export function ChecklistArea({
     onReset();
   };
 
-  // Handoff Summary
+  // Ringkasan Handoff
   const totalItems = items.length;
   const checkedCount = Object.values(checkedState).filter(Boolean).length;
   const progressPercent = totalItems === 0 ? 0 : Math.round((checkedCount / totalItems) * 100);
@@ -416,37 +424,68 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
           <p className="mt-1 text-[10px] text-slate-400">Pilih beberapa file sekaligus untuk analisis QC otomatis</p>
           <input
             type="file"
-            accept="image/*,video/*,.pdf,.svg,.zip,.txt,.ttf,.otf,.woff,.woff2,.doc,.docx"
+            accept="image/*,video/*,.pdf,.svg,.zip,.txt,.ttf,.otf,.woff,.woff2,.doc,.docx,.fig"
             multiple
             onChange={handleFileUpload}
             className="hidden"
           />
         </label>
 
-        {/* Status Scanning / Hasil Batch */}
+        {/* Grid Thumbnail Preview Visual */}
         {uploadedFiles.length > 0 && (
-          <div className="mt-4 space-y-2">
+          <div className="mt-4 space-y-3">
             <div className="flex items-center justify-between text-xs text-slate-300 px-1">
               <span className="font-semibold">{uploadedFiles.length} Berkas Di-upload:</span>
               <button
                 type="button"
                 onClick={handleRemoveAllFiles}
-                className="text-slate-400 hover:text-white flex items-center gap-1 text-[11px]"
+                className="text-slate-400 hover:text-rose-400 flex items-center gap-1 text-[11px] transition"
               >
                 <X className="h-3 w-3" /> Hapus Semua
               </button>
             </div>
 
-            <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto p-2 bg-slate-950/80 rounded-xl border border-slate-800">
-              {uploadedFiles.map((file, i) => (
-                <div
-                  key={`${file.name}-${i}`}
-                  className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 px-2.5 py-1 rounded-lg text-xs text-slate-200 truncate max-w-50"
-                >
-                  <FileText className="h-3.5 w-3.5 text-violet-400 shrink-0" />
-                  <span className="truncate">{file.name}</span>
-                </div>
-              ))}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-56 overflow-y-auto p-2 bg-slate-950/80 rounded-2xl border border-slate-800/80">
+              {uploadedFiles.map((file, i) => {
+                const ext = file.name.split('.').pop()?.toUpperCase() || 'FILE';
+
+                return (
+                  <div
+                    key={`${file.name}-${i}`}
+                    className="group relative flex flex-col items-center justify-center overflow-hidden rounded-xl border border-slate-800 bg-slate-900/90 p-2 text-center transition hover:border-violet-500/50 hover:bg-slate-800"
+                  >
+                    {file.url ? (
+                      <div className="relative h-20 w-full overflow-hidden rounded-lg bg-slate-950/80 flex items-center justify-center">
+                        <img
+                          src={file.url}
+                          alt={file.name}
+                          className="h-full w-full object-contain p-1 transition group-hover:scale-105"
+                        />
+                        <span className="absolute bottom-1 right-1 rounded bg-slate-900/90 px-1.5 py-0.5 text-[9px] font-bold text-violet-300 border border-violet-500/30 backdrop-blur-xs">
+                          {ext}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex h-20 w-full flex-col items-center justify-center rounded-lg bg-slate-950/60 p-2">
+                        {file.isZip ? (
+                          <FolderArchive className="h-8 w-8 text-amber-400" />
+                        ) : file.isPdf ? (
+                          <FileText className="h-8 w-8 text-rose-400" />
+                        ) : (
+                          <ImageIcon className="h-8 w-8 text-violet-400" />
+                        )}
+                        <span className="mt-1 rounded bg-slate-800 px-1.5 py-0.5 text-[9px] font-bold text-slate-300">
+                          {ext}
+                        </span>
+                      </div>
+                    )}
+
+                    <p className="mt-2 w-full truncate text-[11px] font-medium text-slate-300 px-1">
+                      {file.name}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
 
             {isScanning && (
@@ -459,7 +498,7 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
             {aiScanDone && (
               <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium pt-1">
                 <Check className="h-3.5 w-3.5 shrink-0" />
-                <span>Analisis Batch Selesai! Kriteria media sosial & branding terverifikasi.</span>
+                <span>Analisis Batch Selesai! Kriteria terverifikasi.</span>
               </div>
             )}
           </div>
@@ -510,7 +549,7 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
         </div>
       </section>
 
-      {/* Summary & Export */}
+      {/* Ringkasan & Ekspor */}
       <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 backdrop-blur-xl">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-semibold text-white">Ringkasan Handoff</h3>

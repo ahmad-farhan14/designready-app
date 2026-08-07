@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import { Check, Copy, Download, FileText, FolderArchive, Image as ImageIcon, Loader2, RefreshCw, Sparkles, UploadCloud, X } from 'lucide-react';
+import { Check, Copy, Download, FileText, FolderArchive, HelpCircle, Image as ImageIcon, Loader2, RefreshCw, Sparkles, UploadCloud, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { clearFilesFromDB, getFilesFromDB, saveFilesToDB } from '../utils/fileStorage';
 
@@ -195,7 +195,7 @@ export function ChecklistArea({
 
     const isBatch = totalFiles > 1 || hasZip;
 
-    // 3. Matriks Rule Engine Presisi Sesuai Daftar QC Kamu
+    // 3. Matriks Rule Engine Kritis & Presisi
     items.forEach((itemText, idx) => {
       const text = itemText.toLowerCase();
 
@@ -203,13 +203,15 @@ export function ChecklistArea({
       // KATEGORI 1: UI/UX HANDOFF
       // ==========================================
       if (text.includes('layer & komponen') || text.includes('diberi nama')) {
-        if (isBatch || hasZip || normalFiles.some((f) => f.name.toLowerCase().includes('.fig'))) passedIndexes.add(idx);
+        // Hanya tercentang jika ada file .fig asli atau .zip (Gambar JPG/PNG tidak boleh lolos)
+        if (hasZip || normalFiles.some((f) => f.name.toLowerCase().includes('.fig'))) passedIndexes.add(idx);
       } else if (text.includes('spacing & grid') || text.includes('8pt grid')) {
         if (hasHighResImage || hasPdf || hasVector) passedIndexes.add(idx);
       } else if (text.includes('typografi menggunakan style')) {
         if (hasFont || hasPdf || hasTextDoc) passedIndexes.add(idx);
       } else if (text.includes('color variables') || text.includes('variables/styles')) {
-        if (hasPdf || hasTextDoc || hasVector || validImages.length > 0) passedIndexes.add(idx);
+        // Hanya tercentang jika ada dokumen PDF, TXT, atau ZIP
+        if (hasPdf || hasTextDoc || hasZip) passedIndexes.add(idx);
       } else if (text.includes('diekspor dalam resolusi') || text.includes('semua aset diekspor')) {
         if (hasHighResImage || hasVector || isBatch) passedIndexes.add(idx);
       } else if (text.includes('prototype flow') || text.includes('sudah dihubungkan')) {
@@ -246,7 +248,8 @@ export function ChecklistArea({
       } else if (text.includes('konsistensi visual antar postingan')) {
         if (isBatch || hasZip) passedIndexes.add(idx);
       } else if (text.includes('caption & hashtag')) {
-        if (hasTextDoc || hasPdf || isBatch) passedIndexes.add(idx);
+        // Hanya tercentang jika ADA FILE DOKUMEN TEKS/PDF/ZIP (Gambar tidak boleh lolos)
+        if (hasTextDoc || hasPdf || hasZip) passedIndexes.add(idx);
       }
 
       // ==========================================
@@ -405,8 +408,8 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
       </section>
 
       {/* Batch Upload Dropzone */}
-      <section className="rounded-3xl border border-violet-500/30 bg-violet-950/20 p-5 backdrop-blur-xl">
-        <div className="flex items-center justify-between mb-3">
+      <section className="rounded-3xl border border-violet-500/30 bg-violet-950/20 p-5 backdrop-blur-xl space-y-4">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-violet-400" />
             <h3 className="text-sm font-bold text-violet-200">AI Batch Design Inspector</h3>
@@ -430,6 +433,31 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
             className="hidden"
           />
         </label>
+
+        {/* Petunjuk Edukasi File Pendukung Untuk Pengguna */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-4 text-xs text-slate-300">
+          <div className="flex items-center gap-1.5 font-semibold text-violet-300 mb-1.5">
+            <HelpCircle className="h-4 w-4 text-violet-400 shrink-0" />
+            <span>Petunjuk Agar Tercentang 100% (Batch Upload):</span>
+          </div>
+          <p className="text-[11px] leading-relaxed text-slate-400">
+            Upload gambar saja hanya memverifikasi kriteria visual dasar. Untuk meloloskan kriteria teknis penuh, sertakan berkas pendukung:
+          </p>
+          <ul className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-slate-300">
+            <li className="bg-slate-900/90 border border-slate-800 p-2 rounded-xl">
+              <strong className="text-violet-300 block mb-0.5">1. Branding & Logo:</strong>
+              Lampirkan file Vektor (<code className="text-amber-300">.svg</code>), Font (<code className="text-amber-300">.ttf</code>), dan Guideline (<code className="text-amber-300">.pdf</code>).
+            </li>
+            <li className="bg-slate-900/90 border border-slate-800 p-2 rounded-xl">
+              <strong className="text-violet-300 block mb-0.5">2. Media Sosial:</strong>
+              Lampirkan dokumen Caption & Hashtag (<code className="text-amber-300">.txt</code> / <code className="text-amber-300">.doc</code>).
+            </li>
+            <li className="bg-slate-900/90 border border-slate-800 p-2 rounded-xl">
+              <strong className="text-violet-300 block mb-0.5">3. UI/UX Design:</strong>
+              Lampirkan master file Figma (<code className="text-amber-300">.fig</code>) atau dibungkus dalam <code className="text-amber-300">.zip</code>.
+            </li>
+          </ul>
+        </div>
 
         {/* Grid Thumbnail Preview Visual */}
         {uploadedFiles.length > 0 && (
@@ -498,7 +526,7 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
             {aiScanDone && (
               <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium pt-1">
                 <Check className="h-3.5 w-3.5 shrink-0" />
-                <span>Analisis Batch Selesai! Kriteria terverifikasi.</span>
+                <span>Analisis Batch Selesai! Kriteria terverifikasi secara presisi.</span>
               </div>
             )}
           </div>

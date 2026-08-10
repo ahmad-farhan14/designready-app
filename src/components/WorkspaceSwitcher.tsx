@@ -14,6 +14,7 @@ export function WorkspaceSwitcher({ currentOrgId, onSelectWorkspace }: Workspace
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newOrgName, setNewOrgName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     loadOrganizations();
@@ -32,17 +33,23 @@ export function WorkspaceSwitcher({ currentOrgId, onSelectWorkspace }: Workspace
     if (!newOrgName.trim()) return;
 
     setIsCreating(true);
+    setErrorMessage(null);
+
     try {
       const created = await createOrganization(newOrgName.trim());
       if (created) {
+        // 1. Muat ulang daftar organisasi
         await loadOrganizations();
+        // 2. Pilih workspace baru & tutup semua dropdown + modal
         onSelectWorkspace(created.id, created.name);
         setNewOrgName('');
         setShowCreateModal(false);
         setIsOpen(false);
       }
-    } catch (err) {
-      console.error('Gagal membuat organisasi', err);
+    } catch (err: unknown) {
+      console.error('Gagal membuat organisasi:', err);
+      const msg = err instanceof Error ? err.message : 'Gagal membuat tim.';
+      setErrorMessage(msg);
     } finally {
       setIsCreating(false);
     }
@@ -119,7 +126,10 @@ export function WorkspaceSwitcher({ currentOrgId, onSelectWorkspace }: Workspace
 
           <button
             type="button"
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => {
+              setShowCreateModal(true);
+              setErrorMessage(null);
+            }}
             className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-violet-300 transition hover:bg-violet-500/10"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -135,6 +145,12 @@ export function WorkspaceSwitcher({ currentOrgId, onSelectWorkspace }: Workspace
             <p className="mt-1 text-xs text-slate-400">
               Buat ruang kerja tim untuk mengundang desainer, mengagregasi task QC, dan mengelola branding perusahaan.
             </p>
+
+            {errorMessage && (
+              <div className="mt-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
+                {errorMessage}
+              </div>
+            )}
 
             <form onSubmit={handleCreateOrg} className="mt-5 space-y-4">
               <div>

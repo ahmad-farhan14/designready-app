@@ -1,22 +1,37 @@
 import { Trash2 } from 'lucide-react';
-export function Sidebar({
-  tasks,
-  activeTaskId,
-  onSelectTask,
-  onCreateTask,
-  onRequestDeleteTask,
-}: {
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
+
+type SidebarProps = {
   tasks: { id: string; name: string; categoryLabel: string; progressPercent: number; isActive: boolean }[];
   activeTaskId: string | null;
+  currentOrgId: string | null;
+  onSelectWorkspace: (orgId: string | null, orgName: string) => void;
   onSelectTask: (taskId: string) => void;
   onCreateTask: () => void;
   onRequestDeleteTask: (taskId: string) => void;
-}) {
+};
+
+export function Sidebar({
+  tasks,
+  activeTaskId,
+  currentOrgId,
+  onSelectWorkspace,
+  onSelectTask,
+  onCreateTask,
+  onRequestDeleteTask,
+}: SidebarProps) {
   return (
     <aside className="space-y-5 lg:sticky lg:top-6">
       <section className="overflow-hidden rounded-3xl border border-white/10 bg-slate-950/75 shadow-2xl shadow-black/30 backdrop-blur-xl">
-        <div className="border-b border-slate-800/80 bg-slate-900/60 p-5">
-          <div className="flex items-center justify-between gap-3">
+        {/* Header Sidebar & Workspace Switcher */}
+        <div className="border-b border-slate-800/80 bg-slate-900/60 p-5 space-y-4">
+          {/* Component Switcher Workspace Personal vs Enterprise */}
+          <WorkspaceSwitcher
+            currentOrgId={currentOrgId}
+            onSelectWorkspace={onSelectWorkspace}
+          />
+
+          <div className="flex items-center justify-between gap-3 pt-1">
             <div>
               <h2 className="text-base font-semibold text-white">Pipeline Task</h2>
               <p className="mt-1 text-xs text-slate-300/70">{tasks.length} task aktif</p>
@@ -33,6 +48,7 @@ export function Sidebar({
           </div>
         </div>
 
+        {/* List Task Pipeline */}
         <div className="space-y-3 p-4">
           {tasks.length === 0 ? (
             <button

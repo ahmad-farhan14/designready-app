@@ -6,6 +6,7 @@ type OrganizationMemberWithOrg = {
   organizations: Organization | null;
 };
 
+// 1. Ambil daftar organisasi yang diikuti pengguna
 export async function getUserOrganizations(): Promise<Organization[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
@@ -29,12 +30,15 @@ export async function getUserOrganizations(): Promise<Organization[]> {
     .filter((org): org is Organization => org !== null);
 }
 
+// 2. Buat Organisasi / Tim Baru (Khusus Owner)
 export async function createOrganization(name: string): Promise<Organization | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Pengguna belum login.');
 
-  const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  // Buat slug unik dengan tambahan timestamp singkat di akhir
+  const slug = `${name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${Date.now().toString().slice(-4)}`;
 
+  // Insert ke tabel organizations
   const { data: org, error: orgError } = await supabase
     .from('organizations')
     .insert([{ name, slug, subscription_status: 'trial' }])
@@ -43,20 +47,23 @@ export async function createOrganization(name: string): Promise<Organization | n
 
   if (orgError || !org) {
     console.error('Error creating organization:', orgError);
-    return null;
+    throw new Error(orgError?.message || 'Gagal membuat organisasi di database.');
   }
 
+  // Insert pembuat sebagai 'owner' di organization_members
   const { error: memberError } = await supabase
     .from('organization_members')
     .insert([{ organization_id: org.id, user_id: user.id, role: 'owner' }]);
 
   if (memberError) {
     console.error('Error assigning owner role:', memberError);
+    throw new Error(`Organisasi terbuat tetapi gagal mendaftarkan anggota: ${memberError.message}`);
   }
 
   return org as Organization;
 }
 
+// 3. Ambil daftar anggota dalam tim
 export async function getOrganizationMembers(organizationId: string): Promise<OrganizationMember[]> {
   const { data, error } = await supabase
     .from('organization_members')
@@ -71,7 +78,7 @@ export async function getOrganizationMembers(organizationId: string): Promise<Or
   return (data as OrganizationMember[]) || [];
 }
 
-// DIPERBAIKI: Parameter role menggunakan UserRole
+// 4. Undang / Tambah Anggota Baru ke Tim
 export async function inviteMemberToOrg(
   organizationId: string,
   targetUserId: string,

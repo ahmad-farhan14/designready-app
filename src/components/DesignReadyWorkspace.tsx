@@ -9,6 +9,7 @@ import { PanduanUkuran } from './PanduanUkuran';
 import { Sidebar } from './Sidebar';
 import type { ChecklistState, WorkspaceTask } from './workspaceTypes';
 import { PricingModal } from './PricingModal';
+import { TeamSettingsPage } from './TeamSettingsPage';
 
 const TASK_STORAGE_KEY = 'designready-tasks';
 const TASK_SEQUENCE_KEY = 'designready-task-sequence';
@@ -123,7 +124,6 @@ function CreateTaskModal({
     return null;
   }
 
-  // Set limit ke 5 task untuk paket Free
   const FREE_TASK_LIMIT = 5;
   const isLimitReached = taskCount >= FREE_TASK_LIMIT;
   const isSubmitDisabled = formState.name.trim().length === 0 || isLimitReached;
@@ -149,7 +149,6 @@ function CreateTaskModal({
         </div>
 
         <div className="space-y-5 px-6 py-5">
-          {/* Banner Peringatan jika Limit 5 Task Tercapai */}
           {isLimitReached && (
             <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-200">
               <div className="flex items-center justify-between gap-3">
@@ -332,6 +331,11 @@ export function DesignReadyWorkspace() {
 
   const [tasks, setTasks] = useState<WorkspaceTask[]>(initialWorkspaceState.tasks);
 
+  // State Enterprise Workspace
+  const [currentOrgId, setCurrentOrgId] = useState<string | null>(null);
+  const [currentOrgName, setCurrentOrgName] = useState<string>('Personal Workspace');
+  const [showTeamSettings, setShowTeamSettings] = useState(false);
+
   // Read activeTaskId from localStorage on initial render
   const [activeTaskId, setActiveTaskId] = useState<string | null>(() => {
     const savedActiveId = window.localStorage.getItem('designready-active-task-id');
@@ -364,6 +368,16 @@ export function DesignReadyWorkspace() {
       window.localStorage.removeItem('designready-active-task-id');
     }
   }, [activeTaskId]);
+
+  const handleSelectWorkspace = (orgId: string | null, orgName: string) => {
+    setCurrentOrgId(orgId);
+    setCurrentOrgName(orgName);
+    if (orgId) {
+      setShowTeamSettings(true);
+    } else {
+      setShowTeamSettings(false);
+    }
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -545,13 +559,23 @@ export function DesignReadyWorkspace() {
         <div className="grid items-start gap-6 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
           <Sidebar
             tasks={taskCards}
-            activeTaskId={activeTask?.id ?? null}
-            onSelectTask={setActiveTaskId}
+            activeTaskId={activeTaskId}
+            currentOrgId={currentOrgId}
+            onSelectWorkspace={handleSelectWorkspace}
+            onSelectTask={(taskId) => {
+              setActiveTaskId(taskId);
+              setShowTeamSettings(false);
+            }}
             onCreateTask={() => setIsCreateTaskOpen(true)}
             onRequestDeleteTask={handleRequestDeleteTask}
           />
 
-          {activeTask ? (
+          {showTeamSettings && currentOrgId ? (
+            <TeamSettingsPage
+              organizationId={currentOrgId}
+              organizationName={currentOrgName}
+            />
+          ) : activeTask ? (
             <ChecklistArea
               taskId={activeTask.id}
               taskName={activeTask.name}
@@ -590,8 +614,11 @@ export function DesignReadyWorkspace() {
       />
 
       <PricingModal
-        open={isPricingOpen}
+        isOpen={isPricingOpen}
         onClose={() => setIsPricingOpen(false)}
+        onSelectEnterprise={() => {
+          setIsPricingOpen(false);
+        }}
       />
     </div>
   );

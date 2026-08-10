@@ -30,37 +30,25 @@ export async function getUserOrganizations(): Promise<Organization[]> {
     .filter((org): org is Organization => org !== null);
 }
 
-// 2. Buat Organisasi / Tim Baru (Khusus Owner)
+// 2. Buat Organisasi / Tim Baru via RPC Supabase
 export async function createOrganization(name: string): Promise<Organization | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Pengguna belum login.');
 
-  // Buat slug unik dengan tambahan timestamp singkat di akhir
   const slug = `${name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${Date.now().toString().slice(-4)}`;
 
-  // Insert ke tabel organizations
-  const { data: org, error: orgError } = await supabase
-    .from('organizations')
-    .insert([{ name, slug, subscription_status: 'trial' }])
-    .select()
-    .single();
+  // Panggil RPC Function create_organization
+  const { data, error } = await supabase.rpc('create_organization', {
+    org_name: name,
+    org_slug: slug,
+  });
 
-  if (orgError || !org) {
-    console.error('Error creating organization:', orgError);
-    throw new Error(orgError?.message || 'Gagal membuat organisasi di database.');
+  if (error) {
+    console.error('Error creating organization via RPC:', error);
+    throw new Error(error.message);
   }
 
-  // Insert pembuat sebagai 'owner' di organization_members
-  const { error: memberError } = await supabase
-    .from('organization_members')
-    .insert([{ organization_id: org.id, user_id: user.id, role: 'owner' }]);
-
-  if (memberError) {
-    console.error('Error assigning owner role:', memberError);
-    throw new Error(`Organisasi terbuat tetapi gagal mendaftarkan anggota: ${memberError.message}`);
-  }
-
-  return org as Organization;
+  return data as Organization;
 }
 
 // 3. Ambil daftar anggota dalam tim

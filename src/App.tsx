@@ -187,6 +187,7 @@ export default function App() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="relative w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
             <button
+              type="button"
               onClick={() => setIsCreateTaskOpen(false)}
               className="absolute right-4 top-4 rounded-full p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition"
             >
@@ -205,7 +206,7 @@ export default function App() {
                   type="text"
                   required
                   autoFocus
-                  placeholder="cth: ui ux umkm / logo baru / feeds instagram..."
+                  placeholder="cth: UI UX App / Logo Baru / Feeds Instagram..."
                   value={newTaskName}
                   onChange={(e) => setNewTaskName(e.target.value)}
                   className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-violet-500"
@@ -213,16 +214,37 @@ export default function App() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Kategori Jenis Desain (QC)</label>
-                <select
-                  value={newTaskCategory}
-                  onChange={(e) => setNewTaskCategory(e.target.value as CategoryKey)}
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-xs text-white outline-none focus:border-violet-500"
-                >
-                  <option value="ui-ux">UI/UX HANDOFF</option>
-                  <option value="social">ASET MEDIA SOSIAL</option>
-                  <option value="branding">BRANDING & LOGO</option>
-                </select>
+                <label className="block text-xs font-semibold text-slate-300 mb-2">Kategori Jenis Desain (QC)</label>
+                <div className="space-y-2">
+                  {[
+                    { key: 'ui-ux', label: 'UI/UX HANDOFF' },
+                    { key: 'social', label: 'ASET MEDIA SOSIAL' },
+                    { key: 'branding', label: 'BRANDING & LOGO' },
+                  ].map((cat) => {
+                    const isSelected = newTaskCategory === cat.key;
+                    return (
+                      <button
+                        key={cat.key}
+                        type="button"
+                        onClick={() => setNewTaskCategory(cat.key as CategoryKey)}
+                        className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                          isSelected
+                            ? 'border-violet-500/50 bg-violet-500/10 text-white'
+                            : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700 hover:bg-slate-900'
+                        }`}
+                      >
+                        <div
+                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                            isSelected ? 'border-violet-400 bg-violet-500' : 'border-slate-600'
+                          }`}
+                        >
+                          {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                        </div>
+                        <span className="text-xs font-semibold">{cat.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="flex gap-3 pt-3">
@@ -322,6 +344,7 @@ export default function App() {
                 Klik "+ Buat Task Baru" pada pipeline sebelah kiri untuk memulai pemeriksaan kriteria QC.
               </p>
               <button
+                type="button"
                 onClick={() => setIsCreateTaskOpen(true)}
                 className="rounded-2xl bg-violet-600 px-5 py-2.5 text-xs font-semibold text-white hover:bg-violet-500 transition"
               >

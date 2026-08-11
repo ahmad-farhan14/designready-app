@@ -77,10 +77,13 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
     setLoading(true);
     try {
       await removeMemberFromOrg(memberToDelete.id);
+
+      // Filter state lokal secara instan
+      setMembers((prev) => prev.filter((m) => m.id !== memberToDelete.id));
+
       setStatusMessage({ type: 'success', text: 'Anggota berhasil dikeluarkan dari tim.' });
       setDeleteModalOpen(false);
       setMemberToDelete(null);
-      await fetchMembers();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal menghapus anggota.';
       setStatusMessage({ type: 'error', text: msg });

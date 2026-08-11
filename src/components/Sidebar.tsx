@@ -1,4 +1,6 @@
-import { CheckSquare, Settings, Trash2 } from 'lucide-react';
+import { CheckSquare, Settings, Trash2, User } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
 type SidebarProps = {
@@ -24,6 +26,16 @@ export function Sidebar({
   onCreateTask,
   onRequestDeleteTask,
 }: SidebarProps) {
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) {
+        setUserEmail(user.email);
+      }
+    });
+  }, []);
+
   return (
     <aside className="space-y-5 lg:sticky lg:top-6">
       <section className="overflow-hidden rounded-3xl border border-white/10 bg-slate-950/75 shadow-2xl shadow-black/30 backdrop-blur-xl">
@@ -159,6 +171,23 @@ export function Sidebar({
               );
             })
           )}
+        </div>
+
+        {/* Card Profil Pengguna (Bottom Sidebar) */}
+        <div className="border-t border-slate-800/80 p-4 bg-slate-900/40">
+          <div className="flex items-center gap-3 rounded-2xl border border-slate-800/80 bg-slate-950/80 p-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30">
+              <User className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold text-white">
+                {userEmail || 'Memuat akun...'}
+              </p>
+              <p className="text-[10px] text-slate-400 font-mono truncate">
+                {currentOrgId ? 'Enterprise Member' : 'Personal Account'}
+              </p>
+            </div>
+          </div>
         </div>
       </section>
     </aside>

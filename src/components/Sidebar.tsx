@@ -1,12 +1,14 @@
-import { Trash2 } from 'lucide-react';
+import { CheckSquare, Settings, Trash2 } from 'lucide-react';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 
 type SidebarProps = {
   tasks: { id: string; name: string; categoryLabel: string; progressPercent: number; isActive: boolean }[];
   activeTaskId: string | null;
   currentOrgId: string | null;
+  showTeamSettings?: boolean;
   onSelectWorkspace: (orgId: string | null, orgName: string) => void;
   onSelectTask: (taskId: string) => void;
+  onOpenTeamSettings?: () => void;
   onCreateTask: () => void;
   onRequestDeleteTask: (taskId: string) => void;
 };
@@ -15,8 +17,10 @@ export function Sidebar({
   tasks,
   activeTaskId,
   currentOrgId,
+  showTeamSettings,
   onSelectWorkspace,
   onSelectTask,
+  onOpenTeamSettings,
   onCreateTask,
   onRequestDeleteTask,
 }: SidebarProps) {
@@ -30,6 +34,39 @@ export function Sidebar({
             currentOrgId={currentOrgId}
             onSelectWorkspace={onSelectWorkspace}
           />
+
+          {/* Navigasi Tab Khusus Enterprise Workspace */}
+          {currentOrgId && onOpenTeamSettings && (
+            <div className="flex rounded-2xl bg-slate-950/80 p-1 border border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  if (tasks.length > 0) onSelectTask(tasks[0].id);
+                }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-xl transition ${
+                  !showTeamSettings
+                    ? 'bg-violet-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <CheckSquare className="h-3.5 w-3.5" />
+                <span>Task Pipeline</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onOpenTeamSettings}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-semibold rounded-xl transition ${
+                  showTeamSettings
+                    ? 'bg-violet-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Settings className="h-3.5 w-3.5" />
+                <span>Pengaturan Tim</span>
+              </button>
+            </div>
+          )}
 
           <div className="flex items-center justify-between gap-3 pt-1">
             <div>
@@ -68,7 +105,7 @@ export function Sidebar({
             </button>
           ) : (
             tasks.map((task) => {
-              const isActive = task.id === activeTaskId;
+              const isActive = task.id === activeTaskId && !showTeamSettings;
 
               return (
                 <div
@@ -82,7 +119,7 @@ export function Sidebar({
                       onSelectTask(task.id);
                     }
                   }}
-                  className={`group w-full rounded-2xl border p-4 text-left transition-all duration-200 ${
+                  className={`group w-full rounded-2xl border p-4 text-left transition-all duration-200 cursor-pointer ${
                     isActive
                       ? 'border-violet-400/35 bg-violet-500/12 shadow-lg shadow-violet-500/10'
                       : 'border-slate-800/80 bg-slate-900/55 hover:border-slate-700 hover:bg-slate-900/75'

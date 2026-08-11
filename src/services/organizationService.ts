@@ -6,7 +6,7 @@ type OrganizationMemberWithOrg = {
   organizations: Organization | null;
 };
 
-// 1. Ambil daftar organisasi yang diikuti pengguna
+// 1. Ambil daftar organisasi pengguna
 export async function getUserOrganizations(): Promise<Organization[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
@@ -30,14 +30,13 @@ export async function getUserOrganizations(): Promise<Organization[]> {
     .filter((org): org is Organization => org !== null);
 }
 
-// 2. Buat Organisasi / Tim Baru via RPC Supabase
+// 2. Buat Organisasi via RPC
 export async function createOrganization(name: string): Promise<Organization | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Pengguna belum login.');
 
   const slug = `${name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${Date.now().toString().slice(-4)}`;
 
-  // Panggil RPC Function create_organization
   const { data, error } = await supabase.rpc('create_organization', {
     org_name: name,
     org_slug: slug,
@@ -51,7 +50,7 @@ export async function createOrganization(name: string): Promise<Organization | n
   return data as Organization;
 }
 
-// 3. Ambil daftar anggota dalam tim
+// 3. Ambil daftar anggota tim
 export async function getOrganizationMembers(organizationId: string): Promise<OrganizationMember[]> {
   const { data, error } = await supabase
     .from('organization_members')
@@ -66,19 +65,32 @@ export async function getOrganizationMembers(organizationId: string): Promise<Or
   return (data as OrganizationMember[]) || [];
 }
 
-// 4. Undang / Tambah Anggota Baru ke Tim
-export async function inviteMemberToOrg(
+// 4. DIPERBAIKI: Undang Anggota Baru Menggunakan Email Beneran
+export async function inviteMemberByEmail(
   organizationId: string,
-  targetUserId: string,
+  email: string,
   role: UserRole = 'designer'
 ) {
+  // Cari user_id berdasarkan email via RPC
+  const { data: targetUserId, error: rpcError } = await supabase.rpc('get_user_id_by_email', {
+    email_input: email,
+  });
+
+  if (rpcError || !targetUserId) {
+    throw new Error('Pengguna dengan email tersebut tidak ditemukan atau belum terdaftar.');
+  }
+
+  // Insert ke organization_members
   const { data, error } = await supabase
     .from('organization_members')
     .insert([{ organization_id: organizationId, user_id: targetUserId, role }]);
 
   if (error) {
+    if (error.code === '23505') {
+      throw new Error('Pengguna ini sudah menjadi anggota tim.');
+    }
     console.error('Error inviting member:', error);
-    throw error;
+    throw new Error(error.message);
   }
 
   return data;

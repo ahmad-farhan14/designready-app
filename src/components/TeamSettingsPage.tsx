@@ -2,6 +2,7 @@ import { Building2, UserPlus, Shield, Users, AlertCircle, CheckCircle2, Trash2 }
 import { useEffect, useState } from 'react';
 import { getOrganizationMembers, inviteMemberByEmail, removeMemberFromOrg, updateMemberRole } from '../services/organizationService';
 import type { OrganizationMember, UserRole } from '../types/enterprise';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 
 type TeamSettingsPageProps = {
   organizationId: string;
@@ -14,6 +15,10 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
   const [inviteRole, setInviteRole] = useState<UserRole>('designer');
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // State Modal Konfirmasi Hapus Anggota
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState<{ id: string; userId: string } | null>(null);
 
   const fetchMembers = async () => {
     const data = await getOrganizationMembers(organizationId);
@@ -57,21 +62,30 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
     }
   };
 
-  const handleRemoveMember = async (memberId: string, role: string) => {
+  const openDeleteModal = (memberId: string, userId: string, role: string) => {
     if (role === 'owner') {
       setStatusMessage({ type: 'error', text: 'Pemilik tim (Owner) tidak dapat dihapus.' });
       return;
     }
+    setMemberToDelete({ id: memberId, userId });
+    setDeleteModalOpen(true);
+  };
 
-    if (!confirm('Apakah kamu yakin ingin menghapus anggota ini dari tim?')) return;
+  const confirmDeleteMember = async () => {
+    if (!memberToDelete) return;
 
+    setLoading(true);
     try {
-      await removeMemberFromOrg(memberId);
-      setStatusMessage({ type: 'success', text: 'Anggota berhasil dihapus dari tim.' });
+      await removeMemberFromOrg(memberToDelete.id);
+      setStatusMessage({ type: 'success', text: 'Anggota berhasil dikeluarkan dari tim.' });
+      setDeleteModalOpen(false);
+      setMemberToDelete(null);
       await fetchMembers();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal menghapus anggota.';
       setStatusMessage({ type: 'error', text: msg });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -93,6 +107,20 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
 
   return (
     <div className="space-y-6">
+      {/* Modal Peringatan Hapus Anggota */}
+      <ConfirmDeleteModal
+        isOpen={deleteModalOpen}
+        title="Keluarkan Anggota Tim?"
+        description="Apakah kamu yakin ingin mengeluarkan anggota ini dari tim? Tindakan ini tidak dapat dibatalkan."
+        itemName={`User ID: ${memberToDelete?.userId}`}
+        loading={loading}
+        onConfirm={confirmDeleteMember}
+        onCancel={() => {
+          setDeleteModalOpen(false);
+          setMemberToDelete(null);
+        }}
+      />
+
       {/* Header Workspace */}
       <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 backdrop-blur-xl">
         <div className="flex items-center gap-3">
@@ -203,7 +231,7 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
                     </select>
 
                     <button
-                      onClick={() => handleRemoveMember(member.id, member.role)}
+                      onClick={() => openDeleteModal(member.id, member.user_id, member.role)}
                       title="Hapus Anggota"
                       className="flex h-8 w-8 items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-400 transition hover:bg-rose-500 hover:text-white"
                     >

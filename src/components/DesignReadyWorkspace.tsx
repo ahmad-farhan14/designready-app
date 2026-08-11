@@ -44,11 +44,7 @@ function createTaskFromNumber(taskNumber: number, categoryKey: CategoryKey = 'ui
 function inferNextTaskNumber(tasks: WorkspaceTask[]) {
   const highestNumericName = tasks.reduce((highest, task) => {
     const parsedNumber = Number(task.name);
-
-    if (!Number.isFinite(parsedNumber)) {
-      return highest;
-    }
-
+    if (!Number.isFinite(parsedNumber)) return highest;
     return Math.max(highest, parsedNumber);
   }, 0);
 
@@ -62,7 +58,6 @@ function loadWorkspaceState(): { tasks: WorkspaceTask[]; nextTaskNumber: number 
 
     if (stored) {
       const parsed = JSON.parse(stored) as WorkspaceTask[];
-
       const normalizedTasks = parsed.map((task) => ({
         ...task,
         checkedState: task.checkedState ?? createEmptyChecklistState(),
@@ -76,23 +71,21 @@ function loadWorkspaceState(): { tasks: WorkspaceTask[]; nextTaskNumber: number 
         ? Math.max(storedSequence, inferredNextTaskNumber)
         : inferredNextTaskNumber;
 
-      return {
-        tasks: filteredTasks,
-        nextTaskNumber,
-      };
+      return { tasks: filteredTasks, nextTaskNumber };
     }
   } catch (error) {
-    console.warn('Failed to read localStorage', error);
+    console.warn('Gagal membaca localStorage', error);
   }
 
   return {
-    tasks: [createTaskFromNumber(1)],
-    nextTaskNumber: 2,
+    tasks: [],
+    nextTaskNumber: 1,
   };
 }
 
 function getTaskProgress(task: WorkspaceTask) {
-  const totalItems = CHECKLIST_ITEMS[task.categoryKey].length;
+  const items = CHECKLIST_ITEMS[task.categoryKey] ?? [];
+  const totalItems = items.length;
   const checkedCount = Object.values(task.checkedState[task.categoryKey] ?? {}).filter(Boolean).length;
   const progressPercent = totalItems === 0 ? 0 : Math.round((checkedCount / totalItems) * 100);
 
@@ -120,9 +113,7 @@ function CreateTaskModal({
   onSubmit: () => void;
   onOpenPricing: () => void;
 }) {
-  if (!open) {
-    return null;
-  }
+  if (!open) return null;
 
   const FREE_TASK_LIMIT = 5;
   const isLimitReached = taskCount >= FREE_TASK_LIMIT;
@@ -142,7 +133,6 @@ function CreateTaskModal({
             type="button"
             onClick={onClose}
             className="rounded-full p-1 text-slate-400 transition hover:bg-white/5 hover:text-white"
-            aria-label="Tutup modal"
           >
             <X className="h-5 w-5" />
           </button>
@@ -154,9 +144,7 @@ function CreateTaskModal({
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 shrink-0 text-amber-400" />
-                  <span>
-                    Batas paket <strong>Starter (Maks. 5 Task)</strong> telah tercapai.
-                  </span>
+                  <span>Batas paket <strong>Starter (Maks. 5 Task)</strong> telah tercapai.</span>
                 </div>
                 <button
                   type="button"
@@ -179,12 +167,9 @@ function CreateTaskModal({
               disabled={isLimitReached}
               value={formState.name}
               onChange={(event) => onChange({ ...formState, name: event.target.value })}
-              placeholder={isLimitReached ? "Batas task tercapai..." : "cth: Desain Logo Perusahaan X"}
-              className="mt-2 w-full rounded-2xl border border-violet-500/35 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none ring-0 placeholder:text-slate-500 focus:border-violet-400 disabled:cursor-not-allowed disabled:opacity-50"
+              placeholder={isLimitReached ? 'Batas task tercapai...' : 'cth: Desain Logo Perusahaan X'}
+              className="mt-2 w-full rounded-2xl border border-violet-500/35 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-violet-400 disabled:cursor-not-allowed disabled:opacity-50"
             />
-            <p className="mt-2 text-xs text-slate-400">
-              {isLimitReached ? "Hapus task lama atau upgrade ke Pro untuk menambah task." : "Nama task wajib diisi."}
-            </p>
           </div>
 
           <div>
@@ -220,7 +205,7 @@ function CreateTaskModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-2xl border border-slate-800/80 bg-slate-950/70 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-700 hover:bg-slate-900/80"
+            className="flex-1 rounded-2xl border border-slate-800/80 bg-slate-950/70 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-slate-900"
           >
             Batal
           </button>
@@ -228,7 +213,7 @@ function CreateTaskModal({
             type="button"
             onClick={onSubmit}
             disabled={isSubmitDisabled}
-            className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-violet-500/25 bg-violet-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-violet-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-400 disabled:opacity-50"
           >
             <Plus className="h-4 w-4" />
             Buat Task
@@ -250,16 +235,14 @@ function DeleteTaskModal({
   onClose: () => void;
   onConfirm: () => void;
 }) {
-  if (!open) {
-    return null;
-  }
+  if (!open) return null;
 
   return (
     <div className="modal-overlay-fade fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm">
       <div className="modal-panel-pop w-full max-w-lg overflow-hidden rounded-3xl border border-slate-700/80 bg-slate-900 shadow-2xl shadow-black/60">
         <div className="border-b border-slate-800/80 px-6 py-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-500/15 text-rose-300 animate-shake">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-500/15 text-rose-300">
               <TriangleAlert className="h-5 w-5" />
             </div>
             <div>
@@ -273,9 +256,7 @@ function DeleteTaskModal({
           <div className="rounded-2xl border border-rose-500/15 bg-rose-500/8 p-4 text-sm leading-6 text-slate-200/90">
             <div className="flex items-start gap-3">
               <Trash2 className="mt-0.5 h-4 w-4 shrink-0 text-rose-300" />
-              <p>
-                Task ini akan dihapus permanen dari daftar. Jika task ini sedang aktif, workspace akan kembali ke keadaan kosong.
-              </p>
+              <p>Task ini akan dihapus permanen dari daftar.</p>
             </div>
           </div>
         </div>
@@ -284,7 +265,7 @@ function DeleteTaskModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-2xl border border-slate-800/80 bg-slate-950/70 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-700 hover:bg-slate-900/80"
+            className="flex-1 rounded-2xl border border-slate-800/80 bg-slate-950/70 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-slate-900"
           >
             Batal
           </button>
@@ -294,7 +275,7 @@ function DeleteTaskModal({
             className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
           >
             <Trash2 className="h-4 w-4" />
-            Ya, Hapus Permanent
+            Ya, Hapus Permanen
           </button>
         </div>
       </div>
@@ -316,7 +297,7 @@ function EmptyChecklistState({ onCreateTask }: { onCreateTask: () => void }) {
         <button
           type="button"
           onClick={onCreateTask}
-          className="mt-8 inline-flex items-center gap-2 rounded-xl border border-violet-500/25 bg-violet-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-400"
+          className="mt-8 inline-flex items-center gap-2 rounded-xl bg-violet-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-400"
         >
           <Plus className="h-4 w-4" />
           Buat Task Baru
@@ -330,13 +311,10 @@ export function DesignReadyWorkspace() {
   const initialWorkspaceState = loadWorkspaceState();
 
   const [tasks, setTasks] = useState<WorkspaceTask[]>(initialWorkspaceState.tasks);
-
-  // State Enterprise Workspace
   const [currentOrgId, setCurrentOrgId] = useState<string | null>(null);
   const [currentOrgName, setCurrentOrgName] = useState<string>('Personal Workspace');
   const [showTeamSettings, setShowTeamSettings] = useState(false);
 
-  // Read activeTaskId from localStorage on initial render
   const [activeTaskId, setActiveTaskId] = useState<string | null>(() => {
     const savedActiveId = window.localStorage.getItem('designready-active-task-id');
     const exists = initialWorkspaceState.tasks.some((task) => task.id === savedActiveId);
@@ -354,13 +332,11 @@ export function DesignReadyWorkspace() {
     categoryKey: 'ui-ux',
   });
 
-  // Persist tasks and nextTaskNumber to localStorage
   useEffect(() => {
     window.localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify(tasks));
     window.localStorage.setItem(TASK_SEQUENCE_KEY, String(nextTaskNumber));
   }, [nextTaskNumber, tasks]);
 
-  // Persist activeTaskId to localStorage whenever it changes
   useEffect(() => {
     if (activeTaskId) {
       window.localStorage.setItem('designready-active-task-id', activeTaskId);
@@ -372,11 +348,7 @@ export function DesignReadyWorkspace() {
   const handleSelectWorkspace = (orgId: string | null, orgName: string) => {
     setCurrentOrgId(orgId);
     setCurrentOrgName(orgName);
-    if (orgId) {
-      setShowTeamSettings(true);
-    } else {
-      setShowTeamSettings(false);
-    }
+    setShowTeamSettings(Boolean(orgId));
   };
 
   const handleLogout = async () => {
@@ -385,12 +357,11 @@ export function DesignReadyWorkspace() {
 
   const activeTask = useMemo(() => {
     if (tasks.length === 0) return null;
-    return tasks.find((task) => task.id === activeTaskId) ?? tasks[0];
+    return tasks.find((task) => task.id === activeTaskId) ?? tasks[0] ?? null;
   }, [activeTaskId, tasks]);
 
   const taskCards = tasks.map((task) => {
     const progress = getTaskProgress(task);
-
     return {
       id: task.id,
       name: task.name,
@@ -402,10 +373,7 @@ export function DesignReadyWorkspace() {
 
   const handleCreateTask = () => {
     const trimmedName = formState.name.trim();
-
-    if (trimmedName.length === 0) {
-      return;
-    }
+    if (trimmedName.length === 0) return;
 
     const newTask: WorkspaceTask = {
       ...createTaskFromNumber(nextTaskNumber, formState.categoryKey),
@@ -420,16 +388,11 @@ export function DesignReadyWorkspace() {
   };
 
   const handleToggleItem = (index: number) => {
-    if (!activeTask) {
-      return;
-    }
+    if (!activeTask) return;
 
     setTasks((previousTasks) =>
       previousTasks.map((task) => {
-        if (task.id !== activeTask.id) {
-          return task;
-        }
-
+        if (task.id !== activeTask.id) return task;
         return {
           ...task,
           checkedState: {
@@ -445,9 +408,7 @@ export function DesignReadyWorkspace() {
   };
 
   const handleResetTask = () => {
-    if (!activeTask) {
-      return;
-    }
+    if (!activeTask) return;
 
     setTasks((previousTasks) =>
       previousTasks.map((task) =>
@@ -466,32 +427,24 @@ export function DesignReadyWorkspace() {
 
   const handleRequestDeleteTask = (taskId: string) => {
     const targetTask = tasks.find((task) => task.id === taskId) ?? null;
-
-    if (!targetTask) {
-      return;
-    }
+    if (!targetTask) return;
 
     setTaskToDelete(targetTask);
     setIsDeleteModalOpen(true);
   };
 
   const handleConfirmDeleteTask = () => {
-    if (!taskToDelete) {
-      return;
-    }
+    if (!taskToDelete) return;
 
     setTasks((previousTasks) => {
       const nextTasks = previousTasks.filter((task) => task.id !== taskToDelete.id);
-
       if (nextTasks.length === 0) {
         setActiveTaskId(null);
         return [];
       }
-
       if (activeTaskId === taskToDelete.id) {
         setActiveTaskId(nextTasks[0].id);
       }
-
       return nextTasks;
     });
 
@@ -501,16 +454,6 @@ export function DesignReadyWorkspace() {
 
   return (
     <div className="min-h-dvh bg-[#08111f] text-slate-50">
-      <div className="fixed inset-0 -z-10 overflow-hidden">
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              'radial-gradient(circle at top left, rgba(14,165,233,0.18), transparent 34%), radial-gradient(circle at top right, rgba(124,58,237,0.14), transparent 28%), linear-gradient(180deg, rgba(8,17,31,1) 0%, rgba(5,10,20,1) 100%)',
-          }}
-        />
-      </div>
-
       <header className="mx-auto max-w-7xl px-4 pb-8 pt-10 sm:px-6 lg:px-8">
         <div className="flex items-start justify-between gap-6 border-b border-slate-800/80 pb-8">
           <div>
@@ -519,16 +462,13 @@ export function DesignReadyWorkspace() {
               QC TOOL FOR DESIGNERS
             </div>
             <h1 className="mt-4 text-4xl font-semibold tracking-tight text-white sm:text-5xl">DesignReady</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300/75 sm:text-base">
-              Pastikan kualitas berkas desainmu sempurna sebelum diserahkan ke klien atau pengembang.
-            </p>
           </div>
 
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => setIsPricingOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-300 transition hover:bg-amber-500/20 shadow-lg shadow-amber-500/5"
+              className="inline-flex items-center gap-1.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-300 hover:bg-amber-500/20"
             >
               <Sparkles className="h-4 w-4 fill-amber-300 text-amber-300" />
               Upgrade Pro
@@ -537,7 +477,7 @@ export function DesignReadyWorkspace() {
             <button
               type="button"
               onClick={() => setIsCreateTaskOpen(true)}
-              className="inline-flex items-center gap-2 rounded-2xl border border-violet-500/25 bg-violet-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 transition hover:bg-violet-400"
+              className="inline-flex items-center gap-2 rounded-2xl bg-violet-500 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-400"
             >
               <Plus className="h-4 w-4" />
               Buat Task Baru
@@ -546,7 +486,7 @@ export function DesignReadyWorkspace() {
             <button
               type="button"
               onClick={handleLogout}
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-800"
             >
               <LogOut className="h-4 w-4 text-rose-400" />
               Sign Out
@@ -571,16 +511,13 @@ export function DesignReadyWorkspace() {
           />
 
           {showTeamSettings && currentOrgId ? (
-            <TeamSettingsPage
-              organizationId={currentOrgId}
-              organizationName={currentOrgName}
-            />
+            <TeamSettingsPage organizationId={currentOrgId} organizationName={currentOrgName} />
           ) : activeTask ? (
             <ChecklistArea
               taskId={activeTask.id}
               taskName={activeTask.name}
               categoryLabel={getCategoryLabel(activeTask.categoryKey)}
-              items={CHECKLIST_ITEMS[activeTask.categoryKey]}
+              items={CHECKLIST_ITEMS[activeTask.categoryKey] ?? []}
               checkedState={activeTask.checkedState[activeTask.categoryKey] ?? {}}
               onToggleItem={handleToggleItem}
               onReset={handleResetTask}
@@ -616,9 +553,7 @@ export function DesignReadyWorkspace() {
       <PricingModal
         isOpen={isPricingOpen}
         onClose={() => setIsPricingOpen(false)}
-        onSelectEnterprise={() => {
-          setIsPricingOpen(false);
-        }}
+        onSelectEnterprise={() => setIsPricingOpen(false)}
       />
     </div>
   );

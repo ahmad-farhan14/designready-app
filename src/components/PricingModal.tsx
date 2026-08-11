@@ -49,9 +49,26 @@ export function PricingModal({ isOpen, onClose, onSelectEnterprise }: PricingMod
                 <span className="text-xs text-slate-500"> / selamanya</span>
               </div>
               <ul className="mt-4 space-y-2 text-xs text-slate-300">
-                <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-emerald-400" /> Maksimal 5 Task Pipeline</li>
-                <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-emerald-400" /> Checklist QC Manual</li>
-                <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-emerald-400" /> Auto-save LocalStorage</li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Maksimal 5 Task Pipeline</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Checklist QC Manual (10 Kriteria)</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Auto-save LocalStorage Browser</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Panduan Dimensi Aset Platform</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Ringkasan Handoff Teks Dasar</span>
+                </li>
               </ul>
             </div>
             <button
@@ -78,9 +95,26 @@ export function PricingModal({ isOpen, onClose, onSelectEnterprise }: PricingMod
                 <span className="text-xs text-slate-500"> / bulan</span>
               </div>
               <ul className="mt-4 space-y-2 text-xs text-slate-300">
-                <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-emerald-400" /> AI Design Inspector (ZIP & Batch)</li>
-                <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-emerald-400" /> Unlimited Task Pipeline</li>
-                <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-emerald-400" /> Export Handoff (PDF & TXT)</li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>AI Design Inspector (ZIP & Batch)</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Unlimited Task Pipeline</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Export Handoff (PDF & TXT)</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Dukungan Ekstraksi .SVG/.PDF/.FIG</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Deteksi Dimensi Piksel Real-time</span>
+                </li>
               </ul>
             </div>
             <button
@@ -104,9 +138,26 @@ export function PricingModal({ isOpen, onClose, onSelectEnterprise }: PricingMod
                 <span className="text-xs text-slate-500"> / bulan</span>
               </div>
               <ul className="mt-4 space-y-2 text-xs text-slate-300">
-                <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-emerald-400" /> Multi-User / Team Workspace</li>
-                <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-emerald-400" /> Kelola Anggota & Roles Tim</li>
-                <li className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-emerald-400" /> Custom Branding Logo Export</li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Multi-User / Team Workspace</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Kelola Anggota & Roles Tim</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Custom Branding Logo Export</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Custom Master Checklist Studio</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Dukungan CS Prioritas 24/7</span>
+                </li>
               </ul>
             </div>
 

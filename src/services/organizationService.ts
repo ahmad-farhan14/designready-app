@@ -54,7 +54,7 @@ export async function createOrganization(name: string): Promise<Organization | n
   return data as Organization;
 }
 
-// 3. Ambil daftar anggota tim (Aman, Tanpa 'any', Email ter-fetch terpisah)
+// 3. Ambil daftar anggota tim
 export async function getOrganizationMembers(organizationId: string): Promise<OrganizationMemberWithEmail[]> {
   const { data: members, error } = await supabase
     .from('organization_members')

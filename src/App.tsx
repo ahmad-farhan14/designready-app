@@ -15,6 +15,8 @@ import type { CategoryKey } from './types';
 
 const TASKS_STORAGE_KEY = 'designready_app_tasks_v1';
 const ACTIVE_TASK_KEY = 'designready_app_active_task_v1';
+const CURRENT_ORG_ID_KEY = 'designready_app_current_org_id_v1';
+const CURRENT_ORG_NAME_KEY = 'designready_app_current_org_name_v1';
 const CUSTOM_CHECKLIST_STORAGE_KEY = 'designready_enterprise_custom_checklist_v1';
 
 type TaskItem = {
@@ -31,12 +33,26 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // State Enterprise Workspace
-  const [currentOrgId, setCurrentOrgId] = useState<string | null>(null);
-  const [currentOrgName, setCurrentOrgName] = useState<string>('Personal Workspace');
+  // State Enterprise Workspace (Tersimpan di localStorage agar tidak hilang saat reload)
+  const [currentOrgId, setCurrentOrgId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(CURRENT_ORG_ID_KEY) || null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [currentOrgName, setCurrentOrgName] = useState<string>(() => {
+    try {
+      return localStorage.getItem(CURRENT_ORG_NAME_KEY) || 'Personal Workspace';
+    } catch {
+      return 'Personal Workspace';
+    }
+  });
+
   const [showTeamSettings, setShowTeamSettings] = useState(false);
 
-  // State Task Lokal (Personal)
+  // State Task Lokal (Personal Workspace)
   const [personalTasks, setPersonalTasks] = useState<TaskItem[]>(() => {
     try {
       const saved = localStorage.getItem(TASKS_STORAGE_KEY);
@@ -46,10 +62,10 @@ export default function App() {
     }
   });
 
-  // State Task Organisasi (Enterprise)
+  // State Task Organisasi (Enterprise Workspace)
   const [orgTasks, setOrgTasks] = useState<TaskItem[]>([]);
 
-  // Task aktif memilih antara Personal vs Enterprise
+  // Task aktif memilih antara Personal vs Enterprise Workspace
   const tasks = currentOrgId ? orgTasks : personalTasks;
 
   const [activeTaskId, setActiveTaskId] = useState<string | null>(() => {
@@ -70,7 +86,7 @@ export default function App() {
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskCategory, setNewTaskCategory] = useState<CategoryKey>('ui-ux');
 
-  // Helper membaca kriteria (Default + Custom Master Checklist Studio jika Enterprise)
+  // Helper membaca kriteria
   const getActiveChecklistItems = (categoryKey: CategoryKey): string[] => {
     const defaultItems = CHECKLIST_ITEMS[categoryKey] ?? [];
 
@@ -113,7 +129,7 @@ export default function App() {
     }
   }, [personalTasks]);
 
-  // Sync Task Perusahaan dari Supabase saat Switch Workspace
+  // Sync Task Perusahaan dari Supabase saat Switch/Reload Workspace
   useEffect(() => {
     if (!currentOrgId) return;
 
@@ -132,7 +148,6 @@ export default function App() {
         }));
         setOrgTasks(mapped);
 
-        // Menggunakan functional update agar activeTaskId tidak perlu masuk dependency array
         setActiveTaskId((prevActiveId) => prevActiveId || (mapped[0]?.id ?? null));
       }
     }
@@ -156,14 +171,27 @@ export default function App() {
     }
   }, [activeTaskId]);
 
+  // Simpan pilihan workspace ke localStorage
   const handleSelectWorkspace = (orgId: string | null, orgName: string) => {
     setCurrentOrgId(orgId);
     setCurrentOrgName(orgName);
-    setShowTeamSettings(Boolean(orgId));
+    setShowTeamSettings(false);
     setActiveTaskId(null);
+
+    try {
+      if (orgId) {
+        localStorage.setItem(CURRENT_ORG_ID_KEY, orgId);
+        localStorage.setItem(CURRENT_ORG_NAME_KEY, orgName);
+      } else {
+        localStorage.removeItem(CURRENT_ORG_ID_KEY);
+        localStorage.removeItem(CURRENT_ORG_NAME_KEY);
+      }
+    } catch (err) {
+      console.error('Gagal menyimpan currentOrgId ke localStorage', err);
+    }
   };
 
-  // Handler Buat Task Baru (Dengan Fallback Jika Supabase Error)
+  // Handler Buat Task Baru
   const handleCreateTaskSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskName.trim()) return;
@@ -175,7 +203,6 @@ export default function App() {
     };
 
     if (currentOrgId) {
-      // 1. Coba simpan ke Supabase jika Enterprise Workspace
       try {
         const created = await createOrgTask(
           currentOrgId,
@@ -199,24 +226,12 @@ export default function App() {
           setActiveTaskId(created.id);
         }
       } catch (err) {
-        console.error('Gagal menyimpan ke Supabase, menggunakan fallback state lokal:', err);
-        // Fallback: Tetap munculkan task di UI jika database Supabase belum siap
-        const fallbackId = `org-task-${Date.now()}`;
-        const fallbackTask: TaskItem = {
-          id: fallbackId,
-          name: newTaskName.trim(),
-          categoryKey: newTaskCategory,
-          categoryLabel: categoryLabels[newTaskCategory],
-          progressPercent: 0,
-          isActive: true,
-          checkedState: {},
-        };
-
-        setOrgTasks((prev) => [fallbackTask, ...prev]);
-        setActiveTaskId(fallbackId);
+        console.error('Gagal membuat task di Supabase:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Periksa koneksi/tabel database.';
+        alert(`Gagal menyimpan task ke Supabase: ${errorMessage}`);
+        return;
       }
     } else {
-      // 2. Simpan di local state jika Personal Workspace
       const newTaskId = `task-${Date.now()}`;
       const newTask: TaskItem = {
         id: newTaskId,

@@ -83,8 +83,8 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
     try {
       await removeMemberFromOrg(memberToDelete.id);
 
-      // Filter state lokal secara instan
-      setMembers((prev) => prev.filter((m) => m.id !== memberToDelete.id));
+      // Fetch ulang data resmi dari Supabase agar state lokal & DB sinkron penuh
+      await fetchMembers();
 
       setStatusMessage({ type: 'success', text: 'Anggota berhasil dikeluarkan dari tim.' });
       setDeleteModalOpen(false);
@@ -92,6 +92,9 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal menghapus anggota.';
       setStatusMessage({ type: 'error', text: msg });
+      
+      // Jika terjadi error di DB, sync ulang list member agar UI tidak misleading
+      await fetchMembers();
     } finally {
       setLoading(false);
     }
@@ -330,7 +333,7 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
                 <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                   <div className="flex items-center gap-2">
                     {logoPreviewUrl ? (
-                      <img src={logoPreviewUrl} alt="Logo Studio" className="h-6 object-contain max-w-30]" />
+                      <img src={logoPreviewUrl} alt="Logo Studio" className="h-6 object-contain max-w-30" />
                     ) : (
                       <span className="text-xs font-bold text-violet-400 font-mono">[{studioName.toUpperCase()}]</span>
                     )}

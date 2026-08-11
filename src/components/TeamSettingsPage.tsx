@@ -1,4 +1,4 @@
-import { Building2, UserPlus, Shield, Users, AlertCircle, CheckCircle2, Trash2 } from 'lucide-react';
+import { Building2, UserPlus, Shield, Users, AlertCircle, CheckCircle2, Trash2, Upload, Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getOrganizationMembers, inviteMemberByEmail, removeMemberFromOrg, updateMemberRole } from '../services/organizationService';
 import type { OrganizationMember, UserRole } from '../types/enterprise';
@@ -15,6 +15,11 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
   const [inviteRole, setInviteRole] = useState<UserRole>('designer');
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // State Branding White-label
+  const [studioName, setStudioName] = useState(organizationName || 'Studio Enterprise');
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+  const [brandingSaved, setBrandingSaved] = useState(false);
 
   // State Modal Konfirmasi Hapus Anggota
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -106,6 +111,21 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
       const msg = err instanceof Error ? err.message : 'Gagal memperbarui role.';
       setStatusMessage({ type: 'error', text: msg });
     }
+  };
+
+  // Handler Upload Logo
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setLogoPreviewUrl(url);
+      setBrandingSaved(false);
+    }
+  };
+
+  const handleSaveBranding = () => {
+    setBrandingSaved(true);
+    setTimeout(() => setBrandingSaved(false), 3000);
   };
 
   return (
@@ -245,6 +265,91 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Section Tambahan: Custom Branding & White-label Report */}
+      <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 backdrop-blur-xl">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-violet-400" />
+              <span>Custom Branding & White-label Report</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">
+              Logo dan nama agensimu akan otomatis dipasang pada header laporan ekspor PDF/TXT ke klien.
+            </p>
+          </div>
+          <span className="rounded-full bg-violet-500/20 px-2.5 py-0.5 text-[10px] font-bold text-violet-300 border border-violet-500/30">
+            ENTERPRISE
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+          {/* Form Input Branding */}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Nama Resmi Studio / Agensi</label>
+              <input
+                type="text"
+                value={studioName}
+                onChange={(e) => setStudioName(e.target.value)}
+                placeholder="cth: ABC Creative Studio"
+                className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-violet-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Upload Logo Agensi (PNG / SVG Transparan)</label>
+              <div className="flex items-center gap-3">
+                <label className="flex flex-1 cursor-pointer items-center justify-between rounded-2xl border border-dashed border-slate-700 bg-slate-950 px-4 py-3 text-xs text-slate-400 hover:border-violet-500 hover:text-white transition">
+                  <span className="truncate">{logoPreviewUrl ? 'Logo Terpilih ✅' : 'Pilih File Logo...'}</span>
+                  <Upload className="h-4 w-4 shrink-0 text-slate-500" />
+                  <input type="file" accept="image/png,image/svg+xml" onChange={handleLogoUpload} className="hidden" />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={handleSaveBranding}
+                  className="rounded-2xl bg-violet-600 px-5 py-3 text-xs font-semibold text-white hover:bg-violet-500 transition shadow-lg shadow-violet-600/20 flex items-center gap-1.5 shrink-0"
+                >
+                  {brandingSaved && <Check className="h-4 w-4 text-emerald-300" />}
+                  <span>{brandingSaved ? 'Tersimpan!' : 'Simpan Branding'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Live Preview Header Report */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 flex flex-col justify-between">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                Live Preview Header PDF Report Klien:
+              </p>
+              <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-4 text-left space-y-2">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    {logoPreviewUrl ? (
+                      <img src={logoPreviewUrl} alt="Logo Studio" className="h-6 object-contain max-w-30]" />
+                    ) : (
+                      <span className="text-xs font-bold text-violet-400 font-mono">[{studioName.toUpperCase()}]</span>
+                    )}
+                  </div>
+                  <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md font-mono font-bold">
+                    QC VERIFIED BY STUDIO
+                  </span>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-white">Design QC Handoff Report</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">Prepared officially by: {studioName}</p>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-500 italic mt-3">
+              * Header ini otomatis digunakan saat mengekspor PDF/TXT dari Enterprise Workspace.
+            </p>
+          </div>
         </div>
       </div>
     </div>

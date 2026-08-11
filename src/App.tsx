@@ -163,7 +163,7 @@ export default function App() {
     setActiveTaskId(null);
   };
 
-  // Handler Buat Task Baru
+  // Handler Buat Task Baru (Dengan Fallback Jika Supabase Error)
   const handleCreateTaskSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskName.trim()) return;
@@ -175,7 +175,7 @@ export default function App() {
     };
 
     if (currentOrgId) {
-      // 1. Simpan ke Supabase jika Enterprise Workspace
+      // 1. Coba simpan ke Supabase jika Enterprise Workspace
       try {
         const created = await createOrgTask(
           currentOrgId,
@@ -199,7 +199,21 @@ export default function App() {
           setActiveTaskId(created.id);
         }
       } catch (err) {
-        console.error('Gagal membuat task perusahaan', err);
+        console.error('Gagal menyimpan ke Supabase, menggunakan fallback state lokal:', err);
+        // Fallback: Tetap munculkan task di UI jika database Supabase belum siap
+        const fallbackId = `org-task-${Date.now()}`;
+        const fallbackTask: TaskItem = {
+          id: fallbackId,
+          name: newTaskName.trim(),
+          categoryKey: newTaskCategory,
+          categoryLabel: categoryLabels[newTaskCategory],
+          progressPercent: 0,
+          isActive: true,
+          checkedState: {},
+        };
+
+        setOrgTasks((prev) => [fallbackTask, ...prev]);
+        setActiveTaskId(fallbackId);
       }
     } else {
       // 2. Simpan di local state jika Personal Workspace

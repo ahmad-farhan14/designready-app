@@ -140,6 +140,10 @@ export function PricingModal({ isOpen, onClose, onSelectEnterprise }: PricingMod
               <ul className="mt-4 space-y-2 text-xs text-slate-300">
                 <li className="flex items-center gap-2">
                   <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                  <span>Semua Fitur Studio Pro Tersedia</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
                   <span>Multi-User / Team Workspace</span>
                 </li>
                 <li className="flex items-center gap-2">
@@ -153,10 +157,6 @@ export function PricingModal({ isOpen, onClose, onSelectEnterprise }: PricingMod
                 <li className="flex items-center gap-2">
                   <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
                   <span>Custom Master Checklist Studio</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                  <span>Dukungan CS Prioritas 24/7</span>
                 </li>
               </ul>
             </div>

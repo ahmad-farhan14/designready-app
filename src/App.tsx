@@ -10,6 +10,7 @@ import { Sidebar } from './components/Sidebar';
 import { TeamSettingsPage } from './components/TeamSettingsPage';
 import { CHECKLIST_ITEMS } from './data';
 import { supabase } from './lib/supabase';
+import { createOrgTask, deleteOrgTask, getOrgTasks, updateOrgTaskProgress } from './services/taskService';
 import type { CategoryKey } from './types';
 
 const TASKS_STORAGE_KEY = 'designready_app_tasks_v1';
@@ -35,8 +36,8 @@ export default function App() {
   const [currentOrgName, setCurrentOrgName] = useState<string>('Personal Workspace');
   const [showTeamSettings, setShowTeamSettings] = useState(false);
 
-  // State Task & Active ID (Membaca dari localStorage saat pertama dimuat)
-  const [tasks, setTasks] = useState<TaskItem[]>(() => {
+  // State Task Lokal (Personal)
+  const [personalTasks, setPersonalTasks] = useState<TaskItem[]>(() => {
     try {
       const saved = localStorage.getItem(TASKS_STORAGE_KEY);
       return saved ? JSON.parse(saved) : [];
@@ -44,6 +45,12 @@ export default function App() {
       return [];
     }
   });
+
+  // State Task Organisasi (Enterprise)
+  const [orgTasks, setOrgTasks] = useState<TaskItem[]>([]);
+
+  // Task aktif memilih antara Personal vs Enterprise
+  const tasks = currentOrgId ? orgTasks : personalTasks;
 
   const [activeTaskId, setActiveTaskId] = useState<string | null>(() => {
     try {
@@ -63,7 +70,7 @@ export default function App() {
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskCategory, setNewTaskCategory] = useState<CategoryKey>('ui-ux');
 
-  // Helper membaca gabungan kriteria (Default + Custom Master Checklist Studio jika Enterprise)
+  // Helper membaca kriteria (Default + Custom Master Checklist Studio jika Enterprise)
   const getActiveChecklistItems = (categoryKey: CategoryKey): string[] => {
     const defaultItems = CHECKLIST_ITEMS[categoryKey] ?? [];
 
@@ -97,16 +104,46 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Simpan tasks ke localStorage setiap ada perubahan
+  // Simpan personal tasks ke localStorage
   useEffect(() => {
     try {
-      localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(tasks));
+      localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(personalTasks));
     } catch (err) {
       console.error('Gagal menyimpan task ke localStorage', err);
     }
-  }, [tasks]);
+  }, [personalTasks]);
 
-  // Simpan activeTaskId ke localStorage setiap ada perubahan
+  // Sync Task Perusahaan dari Supabase saat Switch Workspace
+  useEffect(() => {
+    if (!currentOrgId) return;
+
+    let isMounted = true;
+    async function loadTasks() {
+      const dbTasks = await getOrgTasks(currentOrgId!);
+      if (isMounted) {
+        const mapped: TaskItem[] = dbTasks.map((t) => ({
+          id: t.id,
+          name: t.name,
+          categoryKey: t.category_key,
+          categoryLabel: t.category_label,
+          progressPercent: t.progress_percent,
+          isActive: true,
+          checkedState: t.checked_state,
+        }));
+        setOrgTasks(mapped);
+
+        // Menggunakan functional update agar activeTaskId tidak perlu masuk dependency array
+        setActiveTaskId((prevActiveId) => prevActiveId || (mapped[0]?.id ?? null));
+      }
+    }
+
+    loadTasks();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentOrgId]);
+
+  // Simpan activeTaskId ke localStorage
   useEffect(() => {
     try {
       if (activeTaskId) {
@@ -123,10 +160,11 @@ export default function App() {
     setCurrentOrgId(orgId);
     setCurrentOrgName(orgName);
     setShowTeamSettings(Boolean(orgId));
+    setActiveTaskId(null);
   };
 
   // Handler Buat Task Baru
-  const handleCreateTaskSubmit = (e: React.FormEvent) => {
+  const handleCreateTaskSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskName.trim()) return;
 
@@ -136,19 +174,50 @@ export default function App() {
       branding: 'BRANDING & LOGO',
     };
 
-    const newTaskId = `task-${Date.now()}`;
-    const newTask: TaskItem = {
-      id: newTaskId,
-      name: newTaskName.trim(),
-      categoryKey: newTaskCategory,
-      categoryLabel: categoryLabels[newTaskCategory],
-      progressPercent: 0,
-      isActive: true,
-      checkedState: {},
-    };
+    if (currentOrgId) {
+      // 1. Simpan ke Supabase jika Enterprise Workspace
+      try {
+        const created = await createOrgTask(
+          currentOrgId,
+          newTaskName.trim(),
+          newTaskCategory,
+          categoryLabels[newTaskCategory]
+        );
 
-    setTasks((prev) => [newTask, ...prev]);
-    setActiveTaskId(newTaskId);
+        if (created) {
+          const newTask: TaskItem = {
+            id: created.id,
+            name: created.name,
+            categoryKey: created.category_key,
+            categoryLabel: created.category_label,
+            progressPercent: 0,
+            isActive: true,
+            checkedState: {},
+          };
+
+          setOrgTasks((prev) => [newTask, ...prev]);
+          setActiveTaskId(created.id);
+        }
+      } catch (err) {
+        console.error('Gagal membuat task perusahaan', err);
+      }
+    } else {
+      // 2. Simpan di local state jika Personal Workspace
+      const newTaskId = `task-${Date.now()}`;
+      const newTask: TaskItem = {
+        id: newTaskId,
+        name: newTaskName.trim(),
+        categoryKey: newTaskCategory,
+        categoryLabel: categoryLabels[newTaskCategory],
+        progressPercent: 0,
+        isActive: true,
+        checkedState: {},
+      };
+
+      setPersonalTasks((prev) => [newTask, ...prev]);
+      setActiveTaskId(newTaskId);
+    }
+
     setNewTaskName('');
     setIsCreateTaskOpen(false);
     setShowTeamSettings(false);
@@ -158,8 +227,8 @@ export default function App() {
   const handleToggleItem = (index: number) => {
     if (!activeTaskId) return;
 
-    setTasks((prev) =>
-      prev.map((t) => {
+    const updateState = (prevTasks: TaskItem[]) =>
+      prevTasks.map((t) => {
         if (t.id !== activeTaskId) return t;
 
         const updatedChecked = {
@@ -172,26 +241,44 @@ export default function App() {
         const checkedCount = Object.values(updatedChecked).filter(Boolean).length;
         const progress = totalItems === 0 ? 0 : Math.round((checkedCount / totalItems) * 100);
 
+        if (currentOrgId) {
+          updateOrgTaskProgress(t.id, updatedChecked, progress);
+        }
+
         return {
           ...t,
           checkedState: updatedChecked,
           progressPercent: progress,
         };
-      })
-    );
+      });
+
+    if (currentOrgId) {
+      setOrgTasks(updateState);
+    } else {
+      setPersonalTasks(updateState);
+    }
   };
 
   // Handler Reset Checklist
   const handleResetChecklist = () => {
     if (!activeTaskId) return;
 
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === activeTaskId
-          ? { ...t, checkedState: {}, progressPercent: 0 }
-          : t
-      )
-    );
+    const resetState = (prevTasks: TaskItem[]) =>
+      prevTasks.map((t) => {
+        if (t.id !== activeTaskId) return t;
+
+        if (currentOrgId) {
+          updateOrgTaskProgress(t.id, {}, 0);
+        }
+
+        return { ...t, checkedState: {}, progressPercent: 0 };
+      });
+
+    if (currentOrgId) {
+      setOrgTasks(resetState);
+    } else {
+      setPersonalTasks(resetState);
+    }
   };
 
   // Handler Minta Hapus Task
@@ -203,18 +290,35 @@ export default function App() {
   };
 
   // Handler Konfirmasi Hapus Task
-  const handleConfirmDeleteTask = () => {
+  const handleConfirmDeleteTask = async () => {
     if (!taskToDelete) return;
 
-    setTasks((prev) => {
-      const remaining = prev.filter((t) => t.id !== taskToDelete.id);
-      if (remaining.length === 0) {
-        setActiveTaskId(null);
-      } else if (activeTaskId === taskToDelete.id) {
-        setActiveTaskId(remaining[0].id);
+    if (currentOrgId) {
+      try {
+        await deleteOrgTask(taskToDelete.id);
+        setOrgTasks((prev) => {
+          const remaining = prev.filter((t) => t.id !== taskToDelete.id);
+          if (remaining.length === 0) {
+            setActiveTaskId(null);
+          } else if (activeTaskId === taskToDelete.id) {
+            setActiveTaskId(remaining[0].id);
+          }
+          return remaining;
+        });
+      } catch (err) {
+        console.error('Gagal menghapus task perusahaan', err);
       }
-      return remaining;
-    });
+    } else {
+      setPersonalTasks((prev) => {
+        const remaining = prev.filter((t) => t.id !== taskToDelete.id);
+        if (remaining.length === 0) {
+          setActiveTaskId(null);
+        } else if (activeTaskId === taskToDelete.id) {
+          setActiveTaskId(remaining[0].id);
+        }
+        return remaining;
+      });
+    }
 
     setIsDeleteModalOpen(false);
     setTaskToDelete(null);

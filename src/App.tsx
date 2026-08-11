@@ -1,12 +1,26 @@
 import type { Session } from '@supabase/supabase-js';
+import { Plus, X, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ChecklistArea } from './components/ChecklistArea';
+import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 import { LoginPage } from './components/LoginPage';
 import { PanduanUkuran } from './components/PanduanUkuran';
 import { PricingModal } from './components/PricingModal';
 import { Sidebar } from './components/Sidebar';
 import { TeamSettingsPage } from './components/TeamSettingsPage';
+import { CHECKLIST_ITEMS } from './data';
 import { supabase } from './lib/supabase';
+import type { CategoryKey } from './types';
+
+type TaskItem = {
+  id: string;
+  name: string;
+  categoryKey: CategoryKey;
+  categoryLabel: string;
+  progressPercent: number;
+  isActive: boolean;
+  checkedState: Record<number, boolean>;
+};
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -17,16 +31,19 @@ export default function App() {
   const [currentOrgName, setCurrentOrgName] = useState<string>('Personal Workspace');
   const [showTeamSettings, setShowTeamSettings] = useState(false);
 
-  // State Task & Modal
-  const [activeTaskId, setActiveTaskId] = useState<string | null>('task-1');
-  const [isPricingOpen, setIsPricingOpen] = useState(false);
+  // State Task & Active ID (Default Kosong)
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
-  // Dummy tasks state
-  const [tasks, setTasks] = useState([
-    { id: 'task-1', name: 'ui ux umkm', categoryLabel: 'UI/UX HANDOFF', progressPercent: 60, isActive: true },
-    { id: 'task-2', name: 'logo umkm', categoryLabel: 'BRANDING & LOGO', progressPercent: 10, isActive: false },
-    { id: 'task-3', name: 'aset umkm', categoryLabel: 'ASET MEDIA SOSIAL', progressPercent: 80, isActive: false },
-  ]);
+  // State Modal
+  const [isPricingOpen, setIsPricingOpen] = useState(false);
+  const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<TaskItem | null>(null);
+
+  // Form State Buat Task Baru
+  const [newTaskName, setNewTaskName] = useState('');
+  const [newTaskCategory, setNewTaskCategory] = useState<CategoryKey>('ui-ux');
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -44,11 +61,100 @@ export default function App() {
   const handleSelectWorkspace = (orgId: string | null, orgName: string) => {
     setCurrentOrgId(orgId);
     setCurrentOrgName(orgName);
-    if (orgId) {
-      setShowTeamSettings(true);
-    } else {
-      setShowTeamSettings(false);
-    }
+    setShowTeamSettings(Boolean(orgId));
+  };
+
+  // Handler Buat Task Baru
+  const handleCreateTaskSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskName.trim()) return;
+
+    const categoryLabels: Record<CategoryKey, string> = {
+      'ui-ux': 'UI/UX HANDOFF',
+      social: 'ASET MEDIA SOSIAL',
+      branding: 'BRANDING & LOGO',
+    };
+
+    const newTaskId = `task-${Date.now()}`;
+    const newTask: TaskItem = {
+      id: newTaskId,
+      name: newTaskName.trim(),
+      categoryKey: newTaskCategory,
+      categoryLabel: categoryLabels[newTaskCategory],
+      progressPercent: 0,
+      isActive: true,
+      checkedState: {},
+    };
+
+    setTasks((prev) => [newTask, ...prev]);
+    setActiveTaskId(newTaskId);
+    setNewTaskName('');
+    setIsCreateTaskOpen(false);
+  };
+
+  // Handler Toggle Item Checklist
+  const handleToggleItem = (index: number) => {
+    if (!activeTaskId) return;
+
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== activeTaskId) return t;
+
+        const updatedChecked = {
+          ...t.checkedState,
+          [index]: !t.checkedState[index],
+        };
+
+        const totalItems = (CHECKLIST_ITEMS[t.categoryKey] ?? []).length;
+        const checkedCount = Object.values(updatedChecked).filter(Boolean).length;
+        const progress = totalItems === 0 ? 0 : Math.round((checkedCount / totalItems) * 100);
+
+        return {
+          ...t,
+          checkedState: updatedChecked,
+          progressPercent: progress,
+        };
+      })
+    );
+  };
+
+  // Handler Reset Checklist
+  const handleResetChecklist = () => {
+    if (!activeTaskId) return;
+
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === activeTaskId
+          ? { ...t, checkedState: {}, progressPercent: 0 }
+          : t
+      )
+    );
+  };
+
+  // Handler Minta Hapus Task
+  const handleRequestDeleteTask = (id: string) => {
+    const target = tasks.find((t) => t.id === id);
+    if (!target) return;
+    setTaskToDelete(target);
+    setIsDeleteModalOpen(true);
+  };
+
+  // Handler Konfirmasi Hapus Task
+  const handleConfirmDeleteTask = () => {
+    if (!taskToDelete) return;
+
+    setTasks((prev) => {
+      const remaining = prev.filter((t) => t.id !== taskToDelete.id);
+      if (remaining.length === 0) {
+        setActiveTaskId(null);
+      } else if (activeTaskId === taskToDelete.id) {
+        setActiveTaskId(remaining[0].id);
+      }
+      return remaining;
+    });
+
+    setIsDeleteModalOpen(false);
+    setTaskToDelete(null);
   };
 
   if (loading) {
@@ -59,8 +165,86 @@ export default function App() {
     return <LoginPage />;
   }
 
+  const activeTask = tasks.find((t) => t.id === activeTaskId) ?? tasks[0] ?? null;
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-violet-500 selection:text-white">
+      {/* Modal Konfirmasi Hapus Task Custom */}
+      <ConfirmDeleteModal
+        isOpen={isDeleteModalOpen}
+        title="Hapus Task Pipeline?"
+        description="Apakah kamu yakin ingin menghapus task ini? Semua progress checklist task ini akan dihapus secara permanen."
+        itemName={taskToDelete ? `Task: ${taskToDelete.name}` : undefined}
+        onConfirm={handleConfirmDeleteTask}
+        onCancel={() => {
+          setIsDeleteModalOpen(false);
+          setTaskToDelete(null);
+        }}
+      />
+
+      {/* Modal Buat Task Baru Custom */}
+      {isCreateTaskOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+            <button
+              onClick={() => setIsCreateTaskOpen(false)}
+              className="absolute right-4 top-4 rounded-full p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <h3 className="text-xl font-bold text-white mb-1">Buat Task Baru</h3>
+            <p className="text-xs text-slate-400 mb-5">
+              Masukkan nama proyek dan pilih jenis kategori checklist QC.
+            </p>
+
+            <form onSubmit={handleCreateTaskSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Nama Task / Proyek *</label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="cth: ui ux umkm / logo baru / feeds instagram..."
+                  value={newTaskName}
+                  onChange={(e) => setNewTaskName(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-violet-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Kategori Jenis Desain (QC)</label>
+                <select
+                  value={newTaskCategory}
+                  onChange={(e) => setNewTaskCategory(e.target.value as CategoryKey)}
+                  className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-xs text-white outline-none focus:border-violet-500"
+                >
+                  <option value="ui-ux">UI/UX HANDOFF</option>
+                  <option value="social">ASET MEDIA SOSIAL</option>
+                  <option value="branding">BRANDING & LOGO</option>
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateTaskOpen(false)}
+                  className="flex-1 rounded-2xl border border-slate-800 bg-slate-800/50 py-3 text-xs font-semibold text-slate-300 hover:bg-slate-800 transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 rounded-2xl bg-violet-600 py-3 text-xs font-semibold text-white hover:bg-violet-500 transition shadow-lg shadow-violet-600/20"
+                >
+                  Buat Task
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Header Utama */}
       <header className="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -75,9 +259,9 @@ export default function App() {
             <button
               type="button"
               onClick={() => setIsPricingOpen(true)}
-              className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-violet-600 text-white hover:bg-violet-500 transition"
+              className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 transition flex items-center gap-1.5"
             >
-              Upgrade Pro
+              <Sparkles className="h-3.5 w-3.5" /> Upgrade Pro
             </button>
             <button
               type="button"
@@ -95,16 +279,19 @@ export default function App() {
         {/* Left Column: Sidebar dengan Workspace Switcher */}
         <div className="lg:col-span-3">
           <Sidebar
-            tasks={tasks}
-            activeTaskId={activeTaskId}
+            tasks={tasks.map((t) => ({
+              ...t,
+              isActive: t.id === activeTask?.id,
+            }))}
+            activeTaskId={activeTask?.id ?? null}
             currentOrgId={currentOrgId}
             onSelectWorkspace={handleSelectWorkspace}
             onSelectTask={(id) => {
               setActiveTaskId(id);
               setShowTeamSettings(false);
             }}
-            onCreateTask={() => alert('Buat task baru')}
-            onRequestDeleteTask={(id) => setTasks(tasks.filter((t) => t.id !== id))}
+            onCreateTask={() => setIsCreateTaskOpen(true)}
+            onRequestDeleteTask={handleRequestDeleteTask}
           />
         </div>
 
@@ -115,22 +302,32 @@ export default function App() {
               organizationId={currentOrgId}
               organizationName={currentOrgName}
             />
-          ) : (
+          ) : activeTask ? (
             <ChecklistArea
-              taskId={activeTaskId || 'task-1'}
-              taskName="ui ux umkm"
-              categoryLabel="UI/UX HANDOFF"
-              items={[
-                'Layer & Komponen Diberi Nama Rapi',
-                'Spacing & Grid Konsisten (8pt grid)',
-                'Typografi Menggunakan Style Token',
-                'Color Variables / Styles Terorganisir',
-                'Semua Aset Diekspor Dalam Resolusi Tepat',
-              ]}
-              checkedState={{ 0: true, 1: true, 2: true }}
-              onToggleItem={() => {}}
-              onReset={() => {}}
+              taskId={activeTask.id}
+              taskName={activeTask.name}
+              categoryLabel={activeTask.categoryLabel}
+              items={CHECKLIST_ITEMS[activeTask.categoryKey] ?? []}
+              checkedState={activeTask.checkedState}
+              onToggleItem={handleToggleItem}
+              onReset={handleResetChecklist}
             />
+          ) : (
+            <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-8 text-center flex flex-col items-center justify-center min-h-87.5">
+              <div className="h-12 w-12 rounded-2xl bg-violet-500/10 text-violet-400 border border-violet-500/20 flex items-center justify-center mb-3">
+                <Plus className="h-6 w-6" />
+              </div>
+              <h3 className="text-lg font-bold text-white">Belum Ada Task Aktif</h3>
+              <p className="text-xs text-slate-400 max-w-xs mt-1 mb-5">
+                Klik "+ Buat Task Baru" pada pipeline sebelah kiri untuk memulai pemeriksaan kriteria QC.
+              </p>
+              <button
+                onClick={() => setIsCreateTaskOpen(true)}
+                className="rounded-2xl bg-violet-600 px-5 py-2.5 text-xs font-semibold text-white hover:bg-violet-500 transition"
+              >
+                + Buat Task Baru
+              </button>
+            </div>
           )}
         </div>
 

@@ -1,14 +1,11 @@
-// 1. Tipe Key disesuaikan agar menerima 'social-media' maupun 'social'
-export type CategoryKey = 'ui-ux' | 'social-media' | 'social' | 'branding';
+import type { CategoryKey } from './types';
 
 export interface CategoryData {
-  id: CategoryKey;
-  key: CategoryKey; // Ditambahkan agar komponen UI yang membaca category.key tidak error
+  key: CategoryKey;
   label: string;
   items: string[];
 }
 
-// 2. Checklist Items dengan alias key 'social' & 'social-media'
 const uiUxItems = [
   'Layer & Komponen Diberi Nama Rapi & Sesuai Konvensi',
   'Spacing & Grid Konsisten (Sistem 8pt Grid)',
@@ -22,7 +19,7 @@ const uiUxItems = [
   'Siap Share ke Stakeholder & Developer',
 ];
 
-const socialMediaItems = [
+const socialItems = [
   'Dimensi Sesuai Platform (Feed, Story, Reel/Shorts)',
   'Safe Zone Konten Terbebas dari Elemen UI Platform',
   'Font Sudah Diembed / Teks Dikonversi ke Outline',
@@ -48,26 +45,23 @@ const brandingItems = [
   'Package Dalam Satu Folder / Arsip Terkompresi',
 ];
 
-export const CHECKLIST_ITEMS: Record<string, string[]> = {
+export const CHECKLIST_ITEMS: Record<CategoryKey, string[]> = {
   'ui-ux': uiUxItems,
-  'social-media': socialMediaItems,
-  'social': socialMediaItems, // Fallback alias
-  'branding': brandingItems,
+  social: socialItems,
+  branding: brandingItems,
 };
 
-// 3. Ekspor Kategori
 export const CATEGORIES: CategoryData[] = [
-  { id: 'ui-ux', key: 'ui-ux', label: 'UI/UX HANDOFF', items: uiUxItems },
-  { id: 'social-media', key: 'social-media', label: 'ASET MEDIA SOSIAL', items: socialMediaItems },
-  { id: 'branding', key: 'branding', label: 'BRANDING & LOGO', items: brandingItems },
+  { key: 'ui-ux', label: 'UI/UX HANDOFF', items: uiUxItems },
+  { key: 'social', label: 'ASET MEDIA SOSIAL', items: socialItems },
+  { key: 'branding', label: 'BRANDING & LOGO', items: brandingItems },
 ];
 
-// 4. Interface & Ekspor Panduan Ukuran (dengan properti `dim`)
 export interface DimensionSize {
   name: string;
   width: number;
   height: number;
-  dim: string; // Tambahkan dim agar UI PanduanUkuran tidak error TS2339
+  dim: string;
   unit: string;
   description?: string;
 }

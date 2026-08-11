@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { CheckCircle2, Plus, TriangleAlert, X, Trash2, LogOut, Sparkles } from 'lucide-react';
+import { CheckCircle2, Plus, X, LogOut, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { CATEGORIES, CHECKLIST_ITEMS } from '../data';
@@ -10,9 +10,10 @@ import { Sidebar } from './Sidebar';
 import type { ChecklistState, WorkspaceTask } from './workspaceTypes';
 import { PricingModal } from './PricingModal';
 import { TeamSettingsPage } from './TeamSettingsPage';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 
-const TASK_STORAGE_KEY = 'designready-tasks';
-const TASK_SEQUENCE_KEY = 'designready-task-sequence';
+const TASK_STORAGE_KEY = 'designready-tasks-v2';
+const TASK_SEQUENCE_KEY = 'designready-task-sequence-v2';
 
 type CreateTaskFormState = {
   name: string;
@@ -77,6 +78,7 @@ function loadWorkspaceState(): { tasks: WorkspaceTask[]; nextTaskNumber: number 
     console.warn('Gagal membaca localStorage', error);
   }
 
+  // Task awal bersih / kosong
   return {
     tasks: [],
     nextTaskNumber: 1,
@@ -144,7 +146,9 @@ function CreateTaskModal({
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 shrink-0 text-amber-400" />
-                  <span>Batas paket <strong>Starter (Maks. 5 Task)</strong> telah tercapai.</span>
+                  <span>
+                    Batas paket <strong>Starter (Maks. 5 Task)</strong> telah tercapai.
+                  </span>
                 </div>
                 <button
                   type="button"
@@ -167,13 +171,13 @@ function CreateTaskModal({
               disabled={isLimitReached}
               value={formState.name}
               onChange={(event) => onChange({ ...formState, name: event.target.value })}
-              placeholder={isLimitReached ? 'Batas task tercapai...' : 'cth: Desain Logo Perusahaan X'}
+              placeholder={isLimitReached ? 'Batas task tercapai...' : 'cth: Desain Logo Perusahaan X / UI App'}
               className="mt-2 w-full rounded-2xl border border-violet-500/35 bg-slate-950/70 px-4 py-3 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-violet-400 disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
 
           <div>
-            <p className="text-sm font-semibold text-slate-100">Kategori QC</p>
+            <p className="text-sm font-semibold text-slate-100">Kategori Jenis Desain (QC)</p>
             <div className="mt-3 space-y-3">
               {CATEGORIES.map((category) => {
                 const isSelected = formState.categoryKey === category.key;
@@ -217,65 +221,6 @@ function CreateTaskModal({
           >
             <Plus className="h-4 w-4" />
             Buat Task
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DeleteTaskModal({
-  open,
-  taskName,
-  onClose,
-  onConfirm,
-}: {
-  open: boolean;
-  taskName: string;
-  onClose: () => void;
-  onConfirm: () => void;
-}) {
-  if (!open) return null;
-
-  return (
-    <div className="modal-overlay-fade fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-6 backdrop-blur-sm">
-      <div className="modal-panel-pop w-full max-w-lg overflow-hidden rounded-3xl border border-slate-700/80 bg-slate-900 shadow-2xl shadow-black/60">
-        <div className="border-b border-slate-800/80 px-6 py-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-500/15 text-rose-300">
-              <TriangleAlert className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-white">Hapus Task {taskName}?</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-300/75">Tindakan ini tidak dapat dibatalkan.</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="px-6 py-5">
-          <div className="rounded-2xl border border-rose-500/15 bg-rose-500/8 p-4 text-sm leading-6 text-slate-200/90">
-            <div className="flex items-start gap-3">
-              <Trash2 className="mt-0.5 h-4 w-4 shrink-0 text-rose-300" />
-              <p>Task ini akan dihapus permanen dari daftar.</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-3 border-t border-slate-800/80 px-6 py-5">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex-1 rounded-2xl border border-slate-800/80 bg-slate-950/70 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-slate-900"
-          >
-            Batal
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
-          >
-            <Trash2 className="h-4 w-4" />
-            Ya, Hapus Permanen
           </button>
         </div>
       </div>
@@ -357,7 +302,7 @@ export function DesignReadyWorkspace() {
 
   const activeTask = useMemo(() => {
     if (tasks.length === 0) return null;
-    return tasks.find((task) => task.id === activeTaskId) ?? tasks[0] ?? null;
+    return tasks.find((task) => task.id === activeTaskId) ?? null;
   }, [activeTaskId, tasks]);
 
   const taskCards = tasks.map((task) => {
@@ -454,6 +399,19 @@ export function DesignReadyWorkspace() {
 
   return (
     <div className="min-h-dvh bg-[#08111f] text-slate-50">
+      {/* Modal Custom Konfirmasi Hapus Task */}
+      <ConfirmDeleteModal
+        isOpen={isDeleteModalOpen}
+        title="Hapus Task Pipeline?"
+        description="Apakah kamu yakin ingin menghapus task ini? Semua data checklist untuk task ini akan dihapus permanen."
+        itemName={`Task: ${taskToDelete?.name}`}
+        onConfirm={handleConfirmDeleteTask}
+        onCancel={() => {
+          setIsDeleteModalOpen(false);
+          setTaskToDelete(null);
+        }}
+      />
+
       <header className="mx-auto max-w-7xl px-4 pb-8 pt-10 sm:px-6 lg:px-8">
         <div className="flex items-start justify-between gap-6 border-b border-slate-800/80 pb-8">
           <div>
@@ -538,16 +496,6 @@ export function DesignReadyWorkspace() {
         onClose={() => setIsCreateTaskOpen(false)}
         onSubmit={handleCreateTask}
         onOpenPricing={() => setIsPricingOpen(true)}
-      />
-
-      <DeleteTaskModal
-        open={isDeleteModalOpen}
-        taskName={taskToDelete?.name ?? ''}
-        onClose={() => {
-          setIsDeleteModalOpen(false);
-          setTaskToDelete(null);
-        }}
-        onConfirm={handleConfirmDeleteTask}
       />
 
       <PricingModal

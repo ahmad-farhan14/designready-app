@@ -11,16 +11,16 @@ const uiUxItems = [
   'Spacing & Grid Konsisten (Sistem 8pt Grid)',
   'Typografi Menggunakan Style Token / Local Styles',
   'Color Variables / Styles Terorganisir (Light & Dark Mode)',
-  'Semua Aset Diekspor Dalam Resolusi & Ukuran Tepat',
-  'Prototype Flow / Interaksi Antar Layar Sudah Dihubungkan',
-  'Ukuran Artboard / Frame Standar Perangkat',
-  'Catatan & Anotasi Spesifikasi Desain Terlampir',
-  'Organize Per Section / Flow Rapi',
-  'Siap Share ke Stakeholder & Developer',
+  'Semua Frame Berukuran Piksel Utuh (Tanpa Desimal/Sub-pixel)',
+  'Komponen Utama (Master Component) Tersimpan Terpisah',
+  'Auto-Layout Diterapkan pada Form, Button, & List',
+  'Status Interactive / States (Hover, Active, Disabled) Lengkap',
+  'Semua Aset Vektor/Ikon Dikonversi ke Outline / Vector Paths',
+  'Aset Gambar/Ilustrasi Sudah Di-compress & Siap Ekspor (1x, 2x, 3x)',
 ];
 
 const socialItems = [
-  'Dimensi Sesuai Platform (Feed, Story, Reel/Shorts)',
+  'Dimensi Sesuai Platform (Feed 1:1, Story/Reel 9:16, Portrait 4:5)',
   'Safe Zone Konten Terbebas dari Elemen UI Platform',
   'Font Sudah Diembed / Teks Dikonversi ke Outline',
   'Warna Sudah Sesuai Brand Guideline',
@@ -28,7 +28,7 @@ const socialItems = [
   'Format yang Tepat (JPG/PNG/MP4)',
   'Teks Terbaca di Semua Ukuran Layar',
   'Logo & Watermark Sudah Ditambahkan (PNG Transparan)',
-  'Konsistensi Visual Antar Postingan / Grid',
+  'Konsistensi Visual Antar Postingan / Grid Carousel',
   'Caption & Hashtag Terlampir dalam Berkas Teks',
 ];
 
@@ -40,9 +40,9 @@ const brandingItems = [
   'Brand Color Palette Terlampir (HEX/RGB/CMYK)',
   'Tipografi Brand Sudah Ditentukan & Font File Terlampir',
   'Bebas dari Background yang Bentrok (PNG Transparan)',
-  'File Logo Tersedia dalam Berbagai Ukuran',
+  'File Logo Tersedia dalam Berbagai Ukuran (App Icon, Favicon)',
   'Brand Guideline PDF Terlampir (Penggunaan Do & Don’t)',
-  'Package Dalam Satu Folder / Arsip Terkompresi',
+  'Package Dalam Satu Folder / Arsip Terkompresi (.ZIP)',
 ];
 
 export const CHECKLIST_ITEMS: Record<CategoryKey, string[]> = {

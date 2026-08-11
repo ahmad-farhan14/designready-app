@@ -12,6 +12,9 @@ import { CHECKLIST_ITEMS } from './data';
 import { supabase } from './lib/supabase';
 import type { CategoryKey } from './types';
 
+const TASKS_STORAGE_KEY = 'designready_app_tasks_v1';
+const ACTIVE_TASK_KEY = 'designready_app_active_task_v1';
+
 type TaskItem = {
   id: string;
   name: string;
@@ -31,9 +34,23 @@ export default function App() {
   const [currentOrgName, setCurrentOrgName] = useState<string>('Personal Workspace');
   const [showTeamSettings, setShowTeamSettings] = useState(false);
 
-  // State Task & Active ID (Default Kosong)
-  const [tasks, setTasks] = useState<TaskItem[]>([]);
-  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  // State Task & Active ID (Membaca dari localStorage saat pertama dimuat)
+  const [tasks, setTasks] = useState<TaskItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(TASKS_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(ACTIVE_TASK_KEY) || null;
+    } catch {
+      return null;
+    }
+  });
 
   // State Modal
   const [isPricingOpen, setIsPricingOpen] = useState(false);
@@ -45,6 +62,7 @@ export default function App() {
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskCategory, setNewTaskCategory] = useState<CategoryKey>('ui-ux');
 
+  // Supabase Auth Listener
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -57,6 +75,28 @@ export default function App() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Simpan tasks ke localStorage setiap ada perubahan
+  useEffect(() => {
+    try {
+      localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(tasks));
+    } catch (err) {
+      console.error('Gagal menyimpan task ke localStorage', err);
+    }
+  }, [tasks]);
+
+  // Simpan activeTaskId ke localStorage setiap ada perubahan
+  useEffect(() => {
+    try {
+      if (activeTaskId) {
+        localStorage.setItem(ACTIVE_TASK_KEY, activeTaskId);
+      } else {
+        localStorage.removeItem(ACTIVE_TASK_KEY);
+      }
+    } catch (err) {
+      console.error('Gagal menyimpan activeTaskId ke localStorage', err);
+    }
+  }, [activeTaskId]);
 
   const handleSelectWorkspace = (orgId: string | null, orgName: string) => {
     setCurrentOrgId(orgId);

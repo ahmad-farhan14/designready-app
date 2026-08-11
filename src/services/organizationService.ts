@@ -6,6 +6,22 @@ type OrganizationMemberWithOrg = {
   organizations: Organization | null;
 };
 
+export type OrganizationMemberWithEmail = OrganizationMember & {
+  email?: string;
+};
+
+// Interface lokal untuk hasil query join Supabase (menghindari 'any')
+interface DBOrganizationMemberRow {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  role: UserRole;
+  created_at: string;
+  profiles?: {
+    email: string;
+  } | null;
+}
+
 // 1. Ambil daftar organisasi pengguna
 export async function getUserOrganizations(): Promise<Organization[]> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -50,22 +66,41 @@ export async function createOrganization(name: string): Promise<Organization | n
   return data as Organization;
 }
 
-// 3. Ambil daftar anggota tim
-export async function getOrganizationMembers(organizationId: string): Promise<OrganizationMember[]> {
+// 3. Ambil daftar anggota tim (Sudah diperbaiki tanpa tipe 'any')
+export async function getOrganizationMembers(organizationId: string): Promise<OrganizationMemberWithEmail[]> {
   const { data, error } = await supabase
     .from('organization_members')
-    .select('*')
-    .eq('organization_id', organizationId);
+    .select(`
+      id,
+      organization_id,
+      user_id,
+      role,
+      created_at,
+      profiles:user_id (email)
+    `)
+    .eq('organization_id', organizationId)
+    .order('created_at', { ascending: true });
 
   if (error) {
     console.error('Error fetching members:', error);
     return [];
   }
 
-  return (data as OrganizationMember[]) || [];
+  if (!data) return [];
+
+  const rows = data as unknown as DBOrganizationMemberRow[];
+
+  return rows.map((member) => ({
+    id: member.id,
+    organization_id: member.organization_id,
+    user_id: member.user_id,
+    role: member.role,
+    created_at: member.created_at,
+    email: member.profiles?.email || member.user_id,
+  }));
 }
 
-// 4. DIPERBAIKI: Undang Anggota Baru Menggunakan Email Beneran
+// 4. Undang Anggota Baru Menggunakan Email
 export async function inviteMemberByEmail(
   organizationId: string,
   email: string,

@@ -95,3 +95,29 @@ export async function inviteMemberByEmail(
 
   return data;
 }
+
+// 5. Hapus Anggota dari Tim
+export async function removeMemberFromOrg(memberId: string) {
+  const { error } = await supabase
+    .from('organization_members')
+    .delete()
+    .eq('id', memberId);
+
+  if (error) {
+    console.error('Error removing member:', error);
+    throw new Error(`Gagal menghapus anggota: ${error.message}`);
+  }
+}
+
+// 6. Ubah Role Anggota
+export async function updateMemberRole(memberId: string, newRole: UserRole) {
+  const { error } = await supabase
+    .from('organization_members')
+    .update({ role: newRole })
+    .eq('id', memberId);
+
+  if (error) {
+    console.error('Error updating member role:', error);
+    throw new Error(`Gagal mengubah role: ${error.message}`);
+  }
+}

@@ -130,6 +130,7 @@ export default function App() {
     setActiveTaskId(newTaskId);
     setNewTaskName('');
     setIsCreateTaskOpen(false);
+    setShowTeamSettings(false);
   };
 
   // Handler Toggle Item Checklist
@@ -343,15 +344,17 @@ export default function App() {
           <Sidebar
             tasks={tasks.map((t) => ({
               ...t,
-              isActive: t.id === activeTask?.id,
+              isActive: t.id === activeTask?.id && !showTeamSettings,
             }))}
             activeTaskId={activeTask?.id ?? null}
             currentOrgId={currentOrgId}
+            showTeamSettings={showTeamSettings}
             onSelectWorkspace={handleSelectWorkspace}
             onSelectTask={(id) => {
               setActiveTaskId(id);
               setShowTeamSettings(false);
             }}
+            onOpenTeamSettings={() => setShowTeamSettings(true)}
             onCreateTask={() => setIsCreateTaskOpen(true)}
             onRequestDeleteTask={handleRequestDeleteTask}
           />

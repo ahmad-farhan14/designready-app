@@ -14,6 +14,7 @@ import type { CategoryKey } from './types';
 
 const TASKS_STORAGE_KEY = 'designready_app_tasks_v1';
 const ACTIVE_TASK_KEY = 'designready_app_active_task_v1';
+const CUSTOM_CHECKLIST_STORAGE_KEY = 'designready_enterprise_custom_checklist_v1';
 
 type TaskItem = {
   id: string;
@@ -61,6 +62,26 @@ export default function App() {
   // Form State Buat Task Baru
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskCategory, setNewTaskCategory] = useState<CategoryKey>('ui-ux');
+
+  // Helper membaca gabungan kriteria (Default + Custom Master Checklist Studio jika Enterprise)
+  const getActiveChecklistItems = (categoryKey: CategoryKey): string[] => {
+    const defaultItems = CHECKLIST_ITEMS[categoryKey] ?? [];
+
+    if (currentOrgId) {
+      try {
+        const savedCustom = localStorage.getItem(CUSTOM_CHECKLIST_STORAGE_KEY);
+        if (savedCustom) {
+          const parsed = JSON.parse(savedCustom);
+          const customItems = parsed[categoryKey] || [];
+          return [...defaultItems, ...customItems];
+        }
+      } catch {
+        return defaultItems;
+      }
+    }
+
+    return defaultItems;
+  };
 
   // Supabase Auth Listener
   useEffect(() => {
@@ -146,7 +167,8 @@ export default function App() {
           [index]: !t.checkedState[index],
         };
 
-        const totalItems = (CHECKLIST_ITEMS[t.categoryKey] ?? []).length;
+        const currentItems = getActiveChecklistItems(t.categoryKey);
+        const totalItems = currentItems.length;
         const checkedCount = Object.values(updatedChecked).filter(Boolean).length;
         const progress = totalItems === 0 ? 0 : Math.round((checkedCount / totalItems) * 100);
 
@@ -372,7 +394,7 @@ export default function App() {
               taskId={activeTask.id}
               taskName={activeTask.name}
               categoryLabel={activeTask.categoryLabel}
-              items={CHECKLIST_ITEMS[activeTask.categoryKey] ?? []}
+              items={getActiveChecklistItems(activeTask.categoryKey)}
               checkedState={activeTask.checkedState}
               onToggleItem={handleToggleItem}
               onReset={handleResetChecklist}

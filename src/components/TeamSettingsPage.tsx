@@ -1,13 +1,16 @@
-import { Building2, UserPlus, Shield, Users, AlertCircle, CheckCircle2, Trash2, Upload, Check } from 'lucide-react';
+import { Building2, UserPlus, Shield, Users, AlertCircle, CheckCircle2, Trash2, Upload, Check, ListChecks, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getOrganizationMembers, inviteMemberByEmail, removeMemberFromOrg, updateMemberRole } from '../services/organizationService';
 import type { OrganizationMember, UserRole } from '../types/enterprise';
+import type { CategoryKey } from '../types';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 
 type TeamSettingsPageProps = {
   organizationId: string;
   organizationName: string;
 };
+
+const CUSTOM_CHECKLIST_STORAGE_KEY = 'designready_enterprise_custom_checklist_v1';
 
 export function TeamSettingsPage({ organizationId, organizationName }: TeamSettingsPageProps) {
   const [members, setMembers] = useState<OrganizationMember[]>([]);
@@ -20,6 +23,18 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
   const [studioName, setStudioName] = useState(organizationName || 'Studio Enterprise');
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
   const [brandingSaved, setBrandingSaved] = useState(false);
+
+  // State Master Checklist Kustom Enterprise
+  const [selectedCategory, setSelectedCategory] = useState<CategoryKey>('ui-ux');
+  const [newItemText, setNewItemText] = useState('');
+  const [customChecklists, setCustomChecklists] = useState<Record<CategoryKey, string[]>>(() => {
+    try {
+      const saved = localStorage.getItem(CUSTOM_CHECKLIST_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : { 'ui-ux': [], social: [], branding: [] };
+    } catch {
+      return { 'ui-ux': [], social: [], branding: [] };
+    }
+  });
 
   // State Modal Konfirmasi Hapus Anggota
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -46,6 +61,15 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
       isMounted = false;
     };
   }, [organizationId]);
+
+  // Simpan Master Checklist Kustom ke LocalStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(CUSTOM_CHECKLIST_STORAGE_KEY, JSON.stringify(customChecklists));
+    } catch (err) {
+      console.error('Gagal menyimpan master checklist kustom', err);
+    }
+  }, [customChecklists]);
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,8 +106,6 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
     setLoading(true);
     try {
       await removeMemberFromOrg(memberToDelete.id);
-
-      // Fetch ulang data resmi dari Supabase agar state lokal & DB sinkron penuh
       await fetchMembers();
 
       setStatusMessage({ type: 'success', text: 'Anggota berhasil dikeluarkan dari tim.' });
@@ -92,8 +114,6 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal menghapus anggota.';
       setStatusMessage({ type: 'error', text: msg });
-      
-      // Jika terjadi error di DB, sync ulang list member agar UI tidak misleading
       await fetchMembers();
     } finally {
       setLoading(false);
@@ -129,6 +149,27 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
   const handleSaveBranding = () => {
     setBrandingSaved(true);
     setTimeout(() => setBrandingSaved(false), 3000);
+  };
+
+  // Handler Tambah Kriteria Master Checklist Baru
+  const handleAddCustomItem = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newItemText.trim()) return;
+
+    setCustomChecklists((prev) => ({
+      ...prev,
+      [selectedCategory]: [...(prev[selectedCategory] || []), newItemText.trim()],
+    }));
+
+    setNewItemText('');
+  };
+
+  // Handler Hapus Kriteria Master Checklist
+  const handleRemoveCustomItem = (catKey: CategoryKey, indexToRemove: number) => {
+    setCustomChecklists((prev) => ({
+      ...prev,
+      [catKey]: (prev[catKey] || []).filter((_, idx) => idx !== indexToRemove),
+    }));
   };
 
   return (
@@ -271,7 +312,7 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
         </div>
       </div>
 
-      {/* Section Tambahan: Custom Branding & White-label Report */}
+      {/* Section Tambahan 1: Custom Branding & White-label Report */}
       <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 backdrop-blur-xl">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
           <div>
@@ -289,7 +330,6 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
-          {/* Form Input Branding */}
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">Nama Resmi Studio / Agensi</label>
@@ -323,7 +363,6 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
             </div>
           </div>
 
-          {/* Live Preview Header Report */}
           <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 flex flex-col justify-between">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">
@@ -353,6 +392,98 @@ export function TeamSettingsPage({ organizationId, organizationName }: TeamSetti
               * Header ini otomatis digunakan saat mengekspor PDF/TXT dari Enterprise Workspace.
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Section Tambahan 2: Custom Master Checklist Studio */}
+      <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-6 backdrop-blur-xl space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <ListChecks className="h-5 w-5 text-violet-400" />
+              <span>Custom Master Checklist Studio</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">
+              Tambahkan aturan QC kustom khusus agensimu. Kriteria ini akan otomatis muncul pada task seluruh desainer di tim.
+            </p>
+          </div>
+          <span className="rounded-full bg-violet-500/20 px-2.5 py-0.5 text-[10px] font-bold text-violet-300 border border-violet-500/30">
+            ENTERPRISE
+          </span>
+        </div>
+
+        {/* Tab Pilih Kategori */}
+        <div className="flex gap-2 border-b border-slate-800 pb-3">
+          {[
+            { key: 'ui-ux', label: 'UI/UX Handoff' },
+            { key: 'social', label: 'Media Sosial' },
+            { key: 'branding', label: 'Branding & Logo' },
+          ].map((cat) => (
+            <button
+              key={cat.key}
+              type="button"
+              onClick={() => setSelectedCategory(cat.key as CategoryKey)}
+              className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition ${
+                selectedCategory === cat.key
+                  ? 'bg-violet-600 text-white shadow-md'
+                  : 'bg-slate-950 text-slate-400 hover:text-white'
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Form Tambah Item Kustom */}
+        <form onSubmit={handleAddCustomItem} className="flex gap-2">
+          <input
+            type="text"
+            required
+            placeholder={`+ Tambah kriteria QC khusus untuk kategori ${selectedCategory.toUpperCase()}...`}
+            value={newItemText}
+            onChange={(e) => setNewItemText(e.target.value)}
+            className="flex-1 rounded-2xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-xs text-white placeholder-slate-500 outline-none focus:border-violet-500"
+          />
+          <button
+            type="submit"
+            className="rounded-2xl bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-violet-500 transition flex items-center gap-1 shrink-0"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Tambah</span>
+          </button>
+        </form>
+
+        {/* List Item Kustom yang Sudah Ditambahkan */}
+        <div className="space-y-2">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            Kriteria Tambahan Studio ({(customChecklists[selectedCategory] || []).length}):
+          </p>
+
+          {(customChecklists[selectedCategory] || []).length === 0 ? (
+            <p className="text-xs text-slate-500 italic bg-slate-950/40 p-3 rounded-xl border border-slate-800/60">
+              Belum ada kriteria kustom tambahan. Tim masih menggunakan 10 kriteria standar bawaan sistem.
+            </p>
+          ) : (
+            (customChecklists[selectedCategory] || []).map((item, idx) => (
+              <div
+                key={`${item}-${idx}`}
+                className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/60 px-3.5 py-2.5 text-xs text-slate-200"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-violet-400 shrink-0" />
+                  <span>{item}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveCustomItem(selectedCategory, idx)}
+                  className="text-slate-500 hover:text-rose-400 transition"
+                  title="Hapus kriteria"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

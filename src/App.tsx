@@ -213,6 +213,14 @@ export default function App() {
     e.preventDefault();
     if (!newTaskName.trim()) return;
 
+    // CEK LIMIT TASK STARTER: Maksimal 5 Task di Personal Workspace
+    if (!currentOrgId && subscriptionTier === 'starter' && personalTasks.length >= 5) {
+      setIsCreateTaskOpen(false);
+      alert('⚠️ Akun Starter dibatasi maksimal 5 Task Pipeline. Silakan Upgrade ke Pro Studio untuk membuat task tanpa batas!');
+      setIsPricingOpen(true);
+      return;
+    }
+
     const categoryLabels: Record<CategoryKey, string> = {
       'ui-ux': 'UI/UX HANDOFF',
       social: 'ASET MEDIA SOSIAL',

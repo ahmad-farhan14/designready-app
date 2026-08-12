@@ -146,7 +146,7 @@ export function WorkspaceSwitcher({
             className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs font-semibold text-violet-400 hover:bg-violet-500/10 transition"
           >
             <span className="flex items-center gap-2">
-              <Plus className="h-4 w-4" /> + Buat Tim Baru
+              <Plus className="h-4 w-4" /> Buat Tim Baru
             </span>
             {subscriptionTier !== 'enterprise' && (
               <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">

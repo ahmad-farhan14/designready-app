@@ -1,9 +1,10 @@
 import type { Session } from '@supabase/supabase-js';
-import { Plus, X, Sparkles, AlertCircle } from 'lucide-react';
+import { Plus, X, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ChecklistArea } from './components/ChecklistArea';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 import { LoginPage } from './components/LoginPage';
+import { NotificationModal } from './components/NotificationModal';
 import { PanduanUkuran } from './components/PanduanUkuran';
 import { PricingModal } from './components/PricingModal';
 import { Sidebar } from './components/Sidebar';
@@ -18,6 +19,7 @@ const ACTIVE_TASK_KEY = 'designready_app_active_task_v1';
 const CURRENT_ORG_ID_KEY = 'designready_app_current_org_id_v1';
 const CURRENT_ORG_NAME_KEY = 'designready_app_current_org_name_v1';
 const CUSTOM_CHECKLIST_STORAGE_KEY = 'designready_enterprise_custom_checklist_v1';
+const USER_TIER_KEY = 'designready_user_tier_v1';
 
 type TaskItem = {
   id: string;
@@ -33,18 +35,31 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // State Toast Notification Custom
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // State Modal Notifikasi Tengah
+  const [notifState, setNotifState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'success' | 'warning' | 'error';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'success',
+  });
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 4500);
+  const showNotif = (title: string, message: string, type: 'success' | 'warning' | 'error' = 'success') => {
+    setNotifState({ isOpen: true, title, message, type });
   };
 
-  // State Tier Subscription (starter | pro | enterprise)
-  const [subscriptionTier, setSubscriptionTier] = useState<'starter' | 'pro' | 'enterprise'>('starter');
+  // State Tier Subscription (starter | pro | enterprise) - disimpan ke localStorage
+  const [subscriptionTier, setSubscriptionTier] = useState<'starter' | 'pro' | 'enterprise'>(() => {
+    try {
+      return (localStorage.getItem(USER_TIER_KEY) as 'starter' | 'pro' | 'enterprise') || 'starter';
+    } catch {
+      return 'starter';
+    }
+  });
 
   // State Enterprise Workspace
   const [currentOrgId, setCurrentOrgId] = useState<string | null>(() => {
@@ -86,7 +101,7 @@ export default function App() {
     }
   });
 
-  // Modals
+  // Modals UI
   const [isPricingOpen, setIsPricingOpen] = useState(false);
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -129,7 +144,7 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fetch Profile Subscription Tier
+  // Fetch Profile Subscription Tier dari Database
   useEffect(() => {
     if (!session?.user) return;
     async function fetchProfileTier() {
@@ -141,7 +156,9 @@ export default function App() {
           .single();
 
         if (data?.subscription_tier) {
-          setSubscriptionTier(data.subscription_tier as 'starter' | 'pro' | 'enterprise');
+          const dbTier = data.subscription_tier as 'starter' | 'pro' | 'enterprise';
+          setSubscriptionTier(dbTier);
+          localStorage.setItem(USER_TIER_KEY, dbTier);
         }
       } catch (err) {
         console.error('Gagal mengambil data tier subscription', err);
@@ -223,10 +240,14 @@ export default function App() {
     e.preventDefault();
     if (!newTaskName.trim()) return;
 
-    // CEK LIMIT TASK STARTER: Maksimal 5 Task
+    // CEK LIMIT TASK STARTER (MAKSIMAL 5)
     if (!currentOrgId && subscriptionTier === 'starter' && personalTasks.length >= 5) {
       setIsCreateTaskOpen(false);
-      triggerToast('Akun Starter dibatasi maksimal 5 Task Pipeline. Silakan Upgrade ke Pro Studio untuk membuat task tanpa batas!');
+      showNotif(
+        'Batas Task Tercapai',
+        'Akun Starter dibatasi maksimal 5 Task Pipeline. Silakan Upgrade ke Pro Studio untuk membuat task tanpa batas!',
+        'warning'
+      );
       setIsPricingOpen(true);
       return;
     }
@@ -263,7 +284,7 @@ export default function App() {
       } catch (err) {
         console.error('Gagal membuat task di Supabase:', err);
         const errorMessage = err instanceof Error ? err.message : 'Periksa koneksi/tabel database.';
-        triggerToast(`Gagal menyimpan task ke Supabase: ${errorMessage}`);
+        showNotif('Gagal Menyimpan', `Gagal menyimpan task ke Supabase: ${errorMessage}`, 'error');
         return;
       }
     } else {
@@ -395,21 +416,15 @@ export default function App() {
   const activeTask = tasks.find((t) => t.id === activeTaskId) ?? tasks[0] ?? null;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-violet-500 selection:text-white relative">
-      {/* Toast Notification Custom */}
-      {toastMessage && (
-        <div className="fixed top-5 right-5 z-50 flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-slate-900/95 px-4 py-3 text-xs font-semibold text-amber-300 shadow-2xl backdrop-blur-md animate-in slide-in-from-top-2 duration-300 max-w-md">
-          <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
-          <span className="flex-1">{toastMessage}</span>
-          <button
-            type="button"
-            onClick={() => setToastMessage(null)}
-            className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white transition"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-violet-500 selection:text-white">
+      {/* Modal Pop-up Notifikasi Tengah */}
+      <NotificationModal
+        isOpen={notifState.isOpen}
+        title={notifState.title}
+        message={notifState.message}
+        type={notifState.type}
+        onClose={() => setNotifState((prev) => ({ ...prev, isOpen: false }))}
+      />
 
       {/* Modal Hapus Task */}
       <ConfirmDeleteModal
@@ -612,7 +627,15 @@ export default function App() {
         isOpen={isPricingOpen}
         onClose={() => setIsPricingOpen(false)}
         currentTier={subscriptionTier}
-        onTierUpdated={(newTier) => setSubscriptionTier(newTier)}
+        onTierUpdated={(newTier) => {
+          setSubscriptionTier(newTier);
+          localStorage.setItem(USER_TIER_KEY, newTier);
+          showNotif(
+            'Upgrade Berhasil!',
+            '🎉 Selamat! Akun kamu berhasil di-upgrade ke Pro Studio (Demo Mode).',
+            'success'
+          );
+        }}
         onOpenCreateOrg={() => {
           setIsPricingOpen(false);
         }}

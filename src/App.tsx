@@ -33,10 +33,7 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // State Tier Subscription (starter | pro | enterprise)
-  const [subscriptionTier, setSubscriptionTier] = useState<'starter' | 'pro' | 'enterprise'>('starter');
-
-  // State Enterprise Workspace
+  // State Enterprise Workspace (Tersimpan di localStorage agar tidak hilang saat reload)
   const [currentOrgId, setCurrentOrgId] = useState<string | null>(() => {
     try {
       return localStorage.getItem(CURRENT_ORG_ID_KEY) || null;
@@ -122,27 +119,6 @@ export default function App() {
 
     return () => subscription.unsubscribe();
   }, []);
-
-  // Fetch Tier Subscription Pengguna
-  useEffect(() => {
-    if (!session?.user) return;
-    async function fetchProfileTier() {
-      try {
-        const { data } = await supabase
-          .from('profiles')
-          .select('subscription_tier')
-          .eq('id', session!.user.id)
-          .single();
-
-        if (data?.subscription_tier) {
-          setSubscriptionTier(data.subscription_tier as 'starter' | 'pro' | 'enterprise');
-        }
-      } catch (err) {
-        console.error('Gagal mengambil data tier subscription', err);
-      }
-    }
-    fetchProfileTier();
-  }, [session]);
 
   // Simpan personal tasks ke localStorage
   useEffect(() => {
@@ -493,22 +469,18 @@ export default function App() {
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-extrabold text-white tracking-tight">DesignReady</h1>
             <span className="text-[10px] bg-violet-500/20 text-violet-300 border border-violet-500/30 px-2 py-0.5 rounded-full font-bold">
-              {currentOrgId ? 'ENTERPRISE' : subscriptionTier === 'pro' ? 'PRO STUDIO' : 'STARTER'}
+              {currentOrgId ? 'ENTERPRISE' : 'PRO STUDIO'}
             </span>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Tombol Upgrade Pro - Otomatis HILANG jika akun sudah Pro atau Enterprise */}
-            {subscriptionTier === 'starter' && !currentOrgId && (
-              <button
-                type="button"
-                onClick={() => setIsPricingOpen(true)}
-                className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 transition flex items-center gap-1.5"
-              >
-                <Sparkles className="h-3.5 w-3.5" /> Upgrade Pro
-              </button>
-            )}
-
+            <button
+              type="button"
+              onClick={() => setIsPricingOpen(true)}
+              className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 transition flex items-center gap-1.5"
+            >
+              <Sparkles className="h-3.5 w-3.5" /> Upgrade Pro
+            </button>
             <button
               type="button"
               onClick={() => supabase.auth.signOut()}
@@ -590,9 +562,7 @@ export default function App() {
       <PricingModal
         isOpen={isPricingOpen}
         onClose={() => setIsPricingOpen(false)}
-        currentTier={subscriptionTier}
-        onTierUpdated={(newTier) => setSubscriptionTier(newTier)}
-        onOpenCreateOrg={() => {
+        onSelectEnterprise={() => {
           setIsPricingOpen(false);
         }}
       />

@@ -1,7 +1,8 @@
 import JSZip from 'jszip';
-import { Check, Copy, Download, FileText, FolderArchive, HelpCircle, Image as ImageIcon, Loader2, RefreshCw, Sparkles, UploadCloud, X } from 'lucide-react';
+import { Check, Copy, Download, FileText, FolderArchive, HelpCircle, Image as ImageIcon, Loader2, RefreshCw, Sparkles, UploadCloud, X, ZoomIn } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { clearFilesFromDB, getFilesFromDB, saveFilesToDB } from '../utils/fileStorage';
+import { ImageModal } from './ImageModal';
 
 type ChecklistAreaProps = {
   taskId: string;
@@ -55,6 +56,9 @@ export function ChecklistArea({
   const [isScanning, setIsScanning] = useState(false);
   const [aiScanDone, setAiScanDone] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // State untuk Lightbox Image Preview Modal
+  const [selectedPreviewImage, setSelectedPreviewImage] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -195,13 +199,11 @@ export function ChecklistArea({
 
     const isBatch = totalFiles > 1 || hasZip;
 
-    // 3. Matriks Rule Engine Kritis & Presisi
+    // 3. Matriks Rule Engine
     items.forEach((itemText, idx) => {
       const text = itemText.toLowerCase();
 
-      // ==========================================
       // KATEGORI 1: UI/UX HANDOFF
-      // ==========================================
       if (text.includes('layer & komponen') || text.includes('diberi nama')) {
         if (hasZip || normalFiles.some((f) => f.name.toLowerCase().includes('.fig'))) passedIndexes.add(idx);
       } else if (text.includes('spacing & grid') || text.includes('8pt grid')) {
@@ -224,9 +226,7 @@ export function ChecklistArea({
         if (isBatch || hasZip || hasPdf) passedIndexes.add(idx);
       }
 
-      // ==========================================
       // KATEGORI 2: ASET MEDIA SOSIAL
-      // ==========================================
       else if (text.includes('dimensi sesuai platform') || text.includes('feed, story, reel')) {
         if (validImages.length > 0 || hasHighResImage || isBatch) passedIndexes.add(idx);
       } else if (text.includes('safe zone konten')) {
@@ -249,9 +249,7 @@ export function ChecklistArea({
         if (hasTextDoc || hasPdf || hasZip) passedIndexes.add(idx);
       }
 
-      // ==========================================
       // KATEGORI 3: LOGO & BRANDING
-      // ==========================================
       else if (text.includes('format vector') || text.includes('svg/ai/eps')) {
         if (hasVector) passedIndexes.add(idx);
       } else if (text.includes('full color, monochrome, reversed')) {
@@ -368,6 +366,13 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
 
   return (
     <div className="space-y-6">
+      {/* Lightbox Modal Expand Image */}
+      <ImageModal
+        isOpen={!!selectedPreviewImage}
+        imageUrl={selectedPreviewImage}
+        onClose={() => setSelectedPreviewImage(null)}
+      />
+
       {/* Header & Progress */}
       <section className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 backdrop-blur-xl">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-5">
@@ -462,7 +467,7 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
           </ul>
         </div>
 
-        {/* Grid Thumbnail Preview Visual */}
+        {/* Grid Thumbnail Preview Visual (Dengan Fitur Click to Expand / Zoom) */}
         {uploadedFiles.length > 0 && (
           <div className="mt-4 space-y-3">
             <div className="flex items-center justify-between text-xs text-slate-300 px-1">
@@ -486,12 +491,19 @@ ${items.map((item, idx) => `${checkedState[idx] ? '[x]' : '[ ]'} ${item}`).join(
                     className="group relative flex flex-col items-center justify-center overflow-hidden rounded-xl border border-slate-800 bg-slate-900/90 p-2 text-center transition hover:border-violet-500/50 hover:bg-slate-800"
                   >
                     {file.url ? (
-                      <div className="relative h-20 w-full overflow-hidden rounded-lg bg-slate-950/80 flex items-center justify-center">
+                      <div
+                        onClick={() => setSelectedPreviewImage(file.url!)}
+                        className="relative h-20 w-full overflow-hidden rounded-lg bg-slate-950/80 flex items-center justify-center cursor-pointer group/img"
+                        title="Klik untuk memperbesar gambar"
+                      >
                         <img
                           src={file.url}
                           alt={file.name}
-                          className="h-full w-full object-contain p-1 transition group-hover:scale-105"
+                          className="h-full w-full object-contain p-1 transition duration-200 group-hover/img:scale-110"
                         />
+                        <div className="absolute inset-0 bg-violet-950/40 opacity-0 group-hover/img:opacity-100 transition flex items-center justify-center">
+                          <ZoomIn className="h-5 w-5 text-white drop-shadow-md" />
+                        </div>
                         <span className="absolute bottom-1 right-1 rounded bg-slate-900/90 px-1.5 py-0.5 text-[9px] font-bold text-violet-300 border border-violet-500/30 backdrop-blur-xs">
                           {ext}
                         </span>

@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
-import { Plus, X, Sparkles } from 'lucide-react';
+import { Plus, X, Sparkles, AlertCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ChecklistArea } from './components/ChecklistArea';
 import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
@@ -32,6 +32,16 @@ type TaskItem = {
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // State Toast Notification Custom
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const triggerToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4500);
+  };
 
   // State Tier Subscription (starter | pro | enterprise)
   const [subscriptionTier, setSubscriptionTier] = useState<'starter' | 'pro' | 'enterprise'>('starter');
@@ -213,10 +223,10 @@ export default function App() {
     e.preventDefault();
     if (!newTaskName.trim()) return;
 
-    // CEK LIMIT TASK STARTER: Maksimal 5 Task di Personal Workspace
+    // CEK LIMIT TASK STARTER: Maksimal 5 Task
     if (!currentOrgId && subscriptionTier === 'starter' && personalTasks.length >= 5) {
       setIsCreateTaskOpen(false);
-      alert('⚠️ Akun Starter dibatasi maksimal 5 Task Pipeline. Silakan Upgrade ke Pro Studio untuk membuat task tanpa batas!');
+      triggerToast('Akun Starter dibatasi maksimal 5 Task Pipeline. Silakan Upgrade ke Pro Studio untuk membuat task tanpa batas!');
       setIsPricingOpen(true);
       return;
     }
@@ -253,7 +263,7 @@ export default function App() {
       } catch (err) {
         console.error('Gagal membuat task di Supabase:', err);
         const errorMessage = err instanceof Error ? err.message : 'Periksa koneksi/tabel database.';
-        alert(`Gagal menyimpan task ke Supabase: ${errorMessage}`);
+        triggerToast(`Gagal menyimpan task ke Supabase: ${errorMessage}`);
         return;
       }
     } else {
@@ -385,7 +395,22 @@ export default function App() {
   const activeTask = tasks.find((t) => t.id === activeTaskId) ?? tasks[0] ?? null;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-violet-500 selection:text-white">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-violet-500 selection:text-white relative">
+      {/* Toast Notification Custom */}
+      {toastMessage && (
+        <div className="fixed top-5 right-5 z-50 flex items-center gap-3 rounded-2xl border border-amber-500/30 bg-slate-900/95 px-4 py-3 text-xs font-semibold text-amber-300 shadow-2xl backdrop-blur-md animate-in slide-in-from-top-2 duration-300 max-w-md">
+          <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
+          <span className="flex-1">{toastMessage}</span>
+          <button
+            type="button"
+            onClick={() => setToastMessage(null)}
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white transition"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Modal Hapus Task */}
       <ConfirmDeleteModal
         isOpen={isDeleteModalOpen}

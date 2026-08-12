@@ -8,6 +8,7 @@ type PricingModalProps = {
   currentTier: 'starter' | 'pro' | 'enterprise';
   onTierUpdated: (newTier: 'starter' | 'pro' | 'enterprise') => void;
   onOpenCreateOrg: () => void;
+  onShowToast?: (msg: string) => void; // Tambah callback toast
 };
 
 export function PricingModal({
@@ -16,6 +17,7 @@ export function PricingModal({
   currentTier,
   onTierUpdated,
   onOpenCreateOrg,
+  onShowToast,
 }: PricingModalProps) {
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
 
@@ -40,12 +42,16 @@ export function PricingModal({
         onClose();
         onOpenCreateOrg();
       } else {
-        alert('🎉 Selamat! Akun kamu berhasil di-upgrade ke Pro Studio (Demo Mode).');
-        onClose();
+        onClose(); // Langsung tutup modal tanpa alert browser!
+        if (onShowToast) {
+          onShowToast('🎉 Selamat! Akun kamu berhasil di-upgrade ke Pro Studio (Demo Mode).');
+        }
       }
     } catch (err) {
       console.error('Gagal update tier:', err);
-      alert('Gagal memproses simulasi upgrade.');
+      if (onShowToast) {
+        onShowToast('❌ Gagal memproses simulasi upgrade.');
+      }
     } finally {
       setLoadingTier(null);
     }

@@ -1,174 +1,187 @@
-import { Check, Users, X } from 'lucide-react';
+import { Check, Building2, Zap, X } from 'lucide-react';
+import { useState } from 'react';
+import { supabase } from '../lib/supabase';
 
 type PricingModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onSelectEnterprise?: () => void;
+  currentTier: 'starter' | 'pro' | 'enterprise';
+  onTierUpdated: (newTier: 'starter' | 'pro' | 'enterprise') => void;
+  onOpenCreateOrg: () => void;
 };
 
-export function PricingModal({ isOpen, onClose, onSelectEnterprise }: PricingModalProps) {
+export function PricingModal({
+  isOpen,
+  onClose,
+  currentTier,
+  onTierUpdated,
+  onOpenCreateOrg,
+}: PricingModalProps) {
+  const [loadingTier, setLoadingTier] = useState<string | null>(null);
+
   if (!isOpen) return null;
 
-  const handleEnterpriseClick = () => {
-    onClose();
-    if (onSelectEnterprise) {
-      onSelectEnterprise();
+  const handleSimulateUpgrade = async (tier: 'pro' | 'enterprise') => {
+    setLoadingTier(tier);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User belum login');
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ subscription_tier: tier })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      onTierUpdated(tier);
+
+      if (tier === 'enterprise') {
+        onClose();
+        onOpenCreateOrg();
+      } else {
+        alert('🎉 Selamat! Akun kamu berhasil di-upgrade ke Pro Studio (Demo Mode).');
+        onClose();
+      }
+    } catch (err) {
+      console.error('Gagal update tier:', err);
+      alert('Gagal memproses simulasi upgrade.');
+    } finally {
+      setLoadingTier(null);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md">
-      <div className="relative w-full max-w-4xl rounded-3xl border border-slate-800 bg-slate-900/95 p-6 md:p-8 shadow-2xl">
-        {/* Tombol Close Modal */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative w-full max-w-4xl rounded-3xl border border-slate-800 bg-slate-900 p-6 md:p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-5 top-5 rounded-full bg-slate-800 p-2 text-slate-400 hover:bg-slate-700 hover:text-white"
+          className="absolute right-4 top-4 rounded-full p-2 text-slate-400 hover:bg-slate-800 hover:text-white transition"
         >
-          <X className="h-4 w-4" />
+          <X className="h-5 w-5" />
         </button>
 
-        <div className="text-center max-w-xl mx-auto mb-8">
-          <h2 className="text-2xl font-bold text-white">Pilih Paket yang Sesuai Workflow-mu</h2>
-          <p className="text-xs text-slate-400 mt-2">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
+            Pilih Paket yang Sesuai Workflow-mu
+          </h2>
+          <p className="text-xs md:text-sm text-slate-400 mt-2">
             Tingkatkan produktivitas tim desain tanpa batasan fitur QC.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Paket Starter */}
-          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5 flex flex-col justify-between">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Card Starter */}
+          <div className="rounded-3xl border border-slate-800 bg-slate-950/60 p-6 flex flex-col justify-between">
             <div>
-              <div className="flex justify-between items-center">
-                <h3 className="text-sm font-bold text-white">Starter</h3>
-                <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-semibold">Free</span>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-bold text-white">Starter</h3>
+                <span className="text-[10px] bg-slate-800 text-slate-400 px-2.5 py-0.5 rounded-full font-bold">Free</span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Cocok untuk freelancer atau desainer solo.</p>
-              <div className="mt-4">
-                <span className="text-2xl font-extrabold text-white">Rp 0</span>
+              <p className="text-xs text-slate-400 mb-4">Cocok untuk freelancer atau desainer solo.</p>
+              <div className="mb-6">
+                <span className="text-2xl font-black text-white">Rp 0</span>
                 <span className="text-xs text-slate-500"> / selamanya</span>
               </div>
-              <ul className="mt-4 space-y-2 text-xs text-slate-300">
-                <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                  <span>Maksimal 5 Task Pipeline</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                  <span>Checklist QC Manual (10 Kriteria)</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                  <span>Auto-save LocalStorage Browser</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                  <span>Panduan Dimensi Aset Platform</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                  <span>Ringkasan Handoff Teks Dasar</span>
-                </li>
+              <ul className="space-y-3 text-xs text-slate-300 mb-6">
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald-400 shrink-0" /> Maksimal 2 Task Pipeline</li>
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald-400 shrink-0" /> Checklist QC Manual</li>
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald-400 shrink-0" /> Panduan Ukuran Platform</li>
               </ul>
             </div>
+
             <button
+              disabled
               type="button"
-              onClick={onClose}
-              className="mt-6 w-full rounded-xl bg-slate-800 py-2.5 text-xs font-semibold text-slate-300 hover:bg-slate-700"
+              className="w-full rounded-2xl border border-slate-800 bg-slate-900/50 py-3 text-xs font-semibold text-slate-500 cursor-not-allowed"
             >
-              Paket Saat Ini
+              {currentTier === 'starter' ? 'Paket Saat Ini' : 'Gratis'}
             </button>
           </div>
 
-          {/* Paket Pro Studio */}
-          <div className="relative rounded-2xl border border-violet-500/50 bg-violet-950/20 p-5 flex flex-col justify-between shadow-lg shadow-violet-500/10">
-            <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-violet-600 px-3 py-0.5 text-[9px] font-bold tracking-wider text-white uppercase">
+          {/* Card Pro Studio */}
+          <div className="relative rounded-3xl border border-violet-500/50 bg-violet-950/20 p-6 flex flex-col justify-between shadow-xl shadow-violet-500/10">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-violet-600 px-3 py-1 text-[10px] font-extrabold text-white uppercase tracking-wider">
               RECOMMENDED
-            </span>
+            </div>
             <div>
-              <div className="flex justify-between items-center">
-                <h3 className="text-sm font-bold text-violet-200">Pro Studio ⚡</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-bold text-white flex items-center gap-1.5">
+                  Pro Studio <Zap className="h-4 w-4 text-amber-400 fill-amber-400" />
+                </h3>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Untuk profesional & tim agen desain cepat.</p>
-              <div className="mt-4">
-                <span className="text-2xl font-extrabold text-white">Rp 99.000</span>
+              <p className="text-xs text-slate-400 mb-4">Untuk profesional & desainer cepat.</p>
+              <div className="mb-6">
+                <span className="text-2xl font-black text-white">Rp 99.000</span>
                 <span className="text-xs text-slate-500"> / bulan</span>
               </div>
-              <ul className="mt-4 space-y-2 text-xs text-slate-300">
-                <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                  <span>AI Design Inspector (ZIP & Batch)</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                  <span>Unlimited Task Pipeline</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                  <span>Export Handoff (PDF & TXT)</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                  <span>Dukungan Ekstraksi .SVG/.PDF/.FIG</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                  <span>Deteksi Dimensi Piksel Real-time</span>
-                </li>
+              <ul className="space-y-3 text-xs text-slate-300 mb-6">
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald-400 shrink-0" /> Unlimited Task Pipeline</li>
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald-400 shrink-0" /> AI Design Inspector (ZIP & Batch)</li>
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald-400 shrink-0" /> Export Handoff (PDF & TXT)</li>
               </ul>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="mt-6 w-full rounded-xl bg-violet-600 py-2.5 text-xs font-semibold text-white hover:bg-violet-500"
-            >
-              Upgrade ke Pro
-            </button>
+
+            {currentTier === 'pro' ? (
+              <button
+                disabled
+                type="button"
+                className="w-full rounded-2xl bg-violet-500/20 border border-violet-500/30 py-3 text-xs font-semibold text-violet-300 cursor-default"
+              >
+                Paket Saat Ini (Aktif)
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={loadingTier === 'pro'}
+                onClick={() => handleSimulateUpgrade('pro')}
+                className="w-full rounded-2xl bg-violet-600 py-3 text-xs font-semibold text-white hover:bg-violet-500 transition shadow-lg shadow-violet-600/30"
+              >
+                {loadingTier === 'pro' ? 'Memproses...' : 'Simulasi Aktifkan Pro (Demo)'}
+              </button>
+            )}
           </div>
 
-          {/* Paket Enterprise */}
-          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5 flex flex-col justify-between">
+          {/* Card Enterprise */}
+          <div className="rounded-3xl border border-slate-800 bg-slate-950/60 p-6 flex flex-col justify-between">
             <div>
-              <div className="flex justify-between items-center">
-                <h3 className="text-sm font-bold text-white">Enterprise 🏢</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-bold text-white flex items-center gap-1.5">
+                  Enterprise <Building2 className="h-4 w-4 text-violet-400" />
+                </h3>
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">Untuk agensi & tim perusahaan.</p>
-              <div className="mt-4">
-                <span className="text-2xl font-extrabold text-white">Rp 299.000</span>
+              <p className="text-xs text-slate-400 mb-4">Untuk agensi & tim perusahaan.</p>
+              <div className="mb-6">
+                <span className="text-2xl font-black text-white">Rp 299.000</span>
                 <span className="text-xs text-slate-500"> / bulan</span>
               </div>
-              <ul className="mt-4 space-y-2 text-xs text-slate-300">
-                <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                  <span>Semua Fitur Studio Pro Tersedia</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                  <span>Multi-User / Team Workspace</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                  <span>Kelola Anggota & Roles Tim</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                  <span>Custom Branding Logo Export</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                  <span>Custom Master Checklist Studio</span>
-                </li>
+              <ul className="space-y-3 text-xs text-slate-300 mb-6">
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald-400 shrink-0" /> Semua Fitur Studio Pro</li>
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald-400 shrink-0" /> Multi-User / Team Workspace</li>
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald-400 shrink-0" /> Kelola Anggota & Roles Tim</li>
+                <li className="flex items-center gap-2"><Check className="h-4 w-4 text-emerald-400 shrink-0" /> Custom Master Checklist Studio</li>
               </ul>
             </div>
 
-            <button
-              type="button"
-              onClick={handleEnterpriseClick}
-              className="mt-6 flex items-center justify-center gap-1.5 w-full rounded-xl bg-slate-800 py-2.5 text-xs font-semibold text-violet-300 border border-violet-500/30 hover:bg-violet-600 hover:text-white transition"
-            >
-              <Users className="h-3.5 w-3.5" />
-              <span>Coba Fitur Enterprise / Tim</span>
-            </button>
+            {currentTier === 'enterprise' ? (
+              <button
+                disabled
+                type="button"
+                className="w-full rounded-2xl bg-violet-500/20 border border-violet-500/30 py-3 text-xs font-semibold text-violet-300 cursor-default"
+              >
+                Paket Saat Ini (Aktif)
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={loadingTier === 'enterprise'}
+                onClick={() => handleSimulateUpgrade('enterprise')}
+                className="w-full rounded-2xl border border-violet-500/40 bg-violet-500/10 py-3 text-xs font-semibold text-violet-300 hover:bg-violet-500/20 transition"
+              >
+                {loadingTier === 'enterprise' ? 'Memproses...' : 'Simulasi Aktifkan Enterprise'}
+              </button>
+            )}
           </div>
         </div>
       </div>

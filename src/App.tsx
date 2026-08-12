@@ -55,7 +55,7 @@ export default function App() {
 
   const [showTeamSettings, setShowTeamSettings] = useState(false);
 
-  // State Task Lokal (Personal Workspace)
+  // State Task
   const [personalTasks, setPersonalTasks] = useState<TaskItem[]>(() => {
     try {
       const saved = localStorage.getItem(TASKS_STORAGE_KEY);
@@ -65,10 +65,7 @@ export default function App() {
     }
   });
 
-  // State Task Organisasi (Enterprise Workspace)
   const [orgTasks, setOrgTasks] = useState<TaskItem[]>([]);
-
-  // Task aktif memilih antara Personal vs Enterprise Workspace
   const tasks = currentOrgId ? orgTasks : personalTasks;
 
   const [activeTaskId, setActiveTaskId] = useState<string | null>(() => {
@@ -79,17 +76,16 @@ export default function App() {
     }
   });
 
-  // State Modal
+  // Modals
   const [isPricingOpen, setIsPricingOpen] = useState(false);
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<TaskItem | null>(null);
 
-  // Form State Buat Task Baru
+  // Form State
   const [newTaskName, setNewTaskName] = useState('');
   const [newTaskCategory, setNewTaskCategory] = useState<CategoryKey>('ui-ux');
 
-  // Helper membaca kriteria
   const getActiveChecklistItems = (categoryKey: CategoryKey): string[] => {
     const defaultItems = CHECKLIST_ITEMS[categoryKey] ?? [];
 
@@ -109,7 +105,7 @@ export default function App() {
     return defaultItems;
   };
 
-  // Supabase Auth Listener
+  // Auth Listener
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -123,7 +119,7 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fetch Tier Subscription Pengguna dari Database
+  // Fetch Profile Subscription Tier
   useEffect(() => {
     if (!session?.user) return;
     async function fetchProfileTier() {
@@ -144,7 +140,7 @@ export default function App() {
     fetchProfileTier();
   }, [session]);
 
-  // Simpan personal tasks ke localStorage
+  // Sync Personal Tasks
   useEffect(() => {
     try {
       localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(personalTasks));
@@ -153,7 +149,7 @@ export default function App() {
     }
   }, [personalTasks]);
 
-  // Sync Task Perusahaan dari Supabase saat Switch/Reload Workspace
+  // Sync Org Tasks dari Supabase
   useEffect(() => {
     if (!currentOrgId) return;
 
@@ -171,7 +167,6 @@ export default function App() {
           checkedState: t.checked_state,
         }));
         setOrgTasks(mapped);
-
         setActiveTaskId((prevActiveId) => prevActiveId || (mapped[0]?.id ?? null));
       }
     }
@@ -182,7 +177,7 @@ export default function App() {
     };
   }, [currentOrgId]);
 
-  // Simpan activeTaskId ke localStorage
+  // Active Task Storage
   useEffect(() => {
     try {
       if (activeTaskId) {
@@ -191,11 +186,10 @@ export default function App() {
         localStorage.removeItem(ACTIVE_TASK_KEY);
       }
     } catch (err) {
-      console.error('Gagal menyimpan activeTaskId ke localStorage', err);
+      console.error('Gagal menyimpan activeTaskId', err);
     }
   }, [activeTaskId]);
 
-  // Simpan pilihan workspace ke localStorage
   const handleSelectWorkspace = (orgId: string | null, orgName: string) => {
     setCurrentOrgId(orgId);
     setCurrentOrgName(orgName);
@@ -211,11 +205,10 @@ export default function App() {
         localStorage.removeItem(CURRENT_ORG_NAME_KEY);
       }
     } catch (err) {
-      console.error('Gagal menyimpan currentOrgId ke localStorage', err);
+      console.error('Gagal menyimpan currentOrgId', err);
     }
   };
 
-  // Handler Buat Task Baru
   const handleCreateTaskSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskName.trim()) return;
@@ -276,7 +269,6 @@ export default function App() {
     setShowTeamSettings(false);
   };
 
-  // Handler Toggle Item Checklist
   const handleToggleItem = (index: number) => {
     if (!activeTaskId) return;
 
@@ -312,7 +304,6 @@ export default function App() {
     }
   };
 
-  // Handler Reset Checklist
   const handleResetChecklist = () => {
     if (!activeTaskId) return;
 
@@ -334,7 +325,6 @@ export default function App() {
     }
   };
 
-  // Handler Minta Hapus Task
   const handleRequestDeleteTask = (id: string) => {
     const target = tasks.find((t) => t.id === id);
     if (!target) return;
@@ -342,7 +332,6 @@ export default function App() {
     setIsDeleteModalOpen(true);
   };
 
-  // Handler Konfirmasi Hapus Task
   const handleConfirmDeleteTask = async () => {
     if (!taskToDelete) return;
 
@@ -389,7 +378,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-violet-500 selection:text-white">
-      {/* Modal Konfirmasi Hapus Task Custom */}
+      {/* Modal Hapus Task */}
       <ConfirmDeleteModal
         isOpen={isDeleteModalOpen}
         title="Hapus Task Pipeline?"
@@ -402,7 +391,7 @@ export default function App() {
         }}
       />
 
-      {/* Modal Buat Task Baru Custom */}
+      {/* Modal Buat Task Baru */}
       {isCreateTaskOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="relative w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
@@ -498,7 +487,7 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Tombol Upgrade Pro - Otomatis HILANG jika akun sudah Pro atau Enterprise */}
+            {/* Tombol Upgrade Pro otomatis HILANG jika akun sudah Pro/Enterprise */}
             {subscriptionTier === 'starter' && !currentOrgId && (
               <button
                 type="button"
@@ -520,9 +509,8 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Workspace Grid */}
+      {/* Main Grid */}
       <main className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Sidebar dengan Workspace Switcher */}
         <div className="lg:col-span-3">
           <Sidebar
             tasks={tasks.map((t) => ({
@@ -532,6 +520,7 @@ export default function App() {
             activeTaskId={activeTask?.id ?? null}
             currentOrgId={currentOrgId}
             showTeamSettings={showTeamSettings}
+            subscriptionTier={subscriptionTier}
             onSelectWorkspace={handleSelectWorkspace}
             onSelectTask={(id) => {
               setActiveTaskId(id);
@@ -540,10 +529,10 @@ export default function App() {
             onOpenTeamSettings={() => setShowTeamSettings(true)}
             onCreateTask={() => setIsCreateTaskOpen(true)}
             onRequestDeleteTask={handleRequestDeleteTask}
+            onOpenPricing={() => setIsPricingOpen(true)}
           />
         </div>
 
-        {/* Center Column: Halaman Tim atau Area Checklist Task */}
         <div className="lg:col-span-6">
           {showTeamSettings && currentOrgId ? (
             <TeamSettingsPage
@@ -580,13 +569,12 @@ export default function App() {
           )}
         </div>
 
-        {/* Right Column: Panduan Ukuran & Ekspor */}
         <div className="lg:col-span-3">
           <PanduanUkuran />
         </div>
       </main>
 
-      {/* Modal Pricing */}
+      {/* Pricing Modal */}
       <PricingModal
         isOpen={isPricingOpen}
         onClose={() => setIsPricingOpen(false)}

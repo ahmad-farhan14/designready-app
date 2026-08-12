@@ -1,184 +1,199 @@
-import { Building2, Check, ChevronDown, Plus, User } from 'lucide-react';
+import { Building2, Check, ChevronDown, Plus, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
 import { createOrganization, getUserOrganizations } from '../services/organizationService';
-import type { Organization } from '../types/enterprise';
+
+type Workspace = {
+  id: string;
+  name: string;
+};
 
 type WorkspaceSwitcherProps = {
   currentOrgId: string | null;
+  subscriptionTier: 'starter' | 'pro' | 'enterprise';
   onSelectWorkspace: (orgId: string | null, orgName: string) => void;
+  onOpenPricing: () => void;
 };
 
-export function WorkspaceSwitcher({ currentOrgId, onSelectWorkspace }: WorkspaceSwitcherProps) {
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
+export function WorkspaceSwitcher({
+  currentOrgId,
+  subscriptionTier,
+  onSelectWorkspace,
+  onOpenPricing,
+}: WorkspaceSwitcherProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [newOrgName, setNewOrgName] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    loadOrganizations();
-  }, []);
+    async function loadWorkspaces() {
+      const orgs = await getUserOrganizations();
+      setWorkspaces(orgs.map((o) => ({ id: o.id, name: o.name })));
+    }
+    loadWorkspaces();
+  }, [currentOrgId]);
 
-  async function loadOrganizations() {
-    const orgs = await getUserOrganizations();
-    setOrganizations(orgs);
-  }
+  const activeWorkspaceName =
+    currentOrgId
+      ? workspaces.find((w) => w.id === currentOrgId)?.name || 'Enterprise Team'
+      : 'Personal Workspace';
 
-  const currentOrg = organizations.find((o) => o.id === currentOrgId);
-  const currentLabel = currentOrg ? currentOrg.name : 'Personal Workspace';
+  const handleCreateTeamClick = () => {
+    setIsOpen(false);
+    // CEGAT: Jika belum Enterprise, suruh upgrade dulu via Pricing Modal!
+    if (subscriptionTier !== 'enterprise') {
+      onOpenPricing();
+    } else {
+      setIsCreateModalOpen(true);
+    }
+  };
 
-  const handleCreateOrg = async (e: React.FormEvent) => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newOrgName.trim()) return;
 
-    setIsCreating(true);
-    setErrorMessage(null);
-
+    setIsSubmitting(true);
     try {
-      const created = await createOrganization(newOrgName.trim());
-      if (created) {
-        // 1. Muat ulang daftar organisasi
-        await loadOrganizations();
-        // 2. Pilih workspace baru & tutup semua dropdown + modal
-        onSelectWorkspace(created.id, created.name);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User belum login');
+
+      const createdOrg = await createOrganization(newOrgName.trim());
+      if (createdOrg) {
+        setWorkspaces((prev) => [...prev, { id: createdOrg.id, name: createdOrg.name }]);
+        onSelectWorkspace(createdOrg.id, createdOrg.name);
         setNewOrgName('');
-        setShowCreateModal(false);
-        setIsOpen(false);
+        setIsCreateModalOpen(false);
       }
-    } catch (err: unknown) {
+    } catch (err) {
       console.error('Gagal membuat organisasi:', err);
-      const msg = err instanceof Error ? err.message : 'Gagal membuat tim.';
-      setErrorMessage(msg);
+      alert('Gagal membuat tim baru. Pastikan tabel Supabase sudah sesuai.');
     } finally {
-      setIsCreating(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="relative w-full">
+    <div className="relative">
+      {/* Dropdown Button */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex w-full items-center justify-between gap-2 rounded-2xl border border-slate-800 bg-slate-900/90 px-3.5 py-2.5 text-left transition hover:border-violet-500/40 hover:bg-slate-800/80"
+        className="flex w-full items-center justify-between rounded-2xl border border-slate-800 bg-slate-900/90 p-3 text-left hover:border-slate-700 transition shadow-sm"
       >
-        <div className="flex items-center gap-2.5 truncate">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-violet-500/20 text-violet-300 border border-violet-500/30">
-            {currentOrgId ? <Building2 className="h-4 w-4" /> : <User className="h-4 w-4" />}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-400 border border-violet-500/20">
+            <Building2 className="h-4 w-4" />
           </div>
-          <div className="truncate">
-            <p className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">
-              {currentOrgId ? 'Enterprise Team' : 'Starter / Pro'}
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+              {currentOrgId ? 'ENTERPRISE TEAM' : 'STARTER / PRO'}
             </p>
-            <p className="truncate text-xs font-bold text-white">{currentLabel}</p>
+            <p className="truncate text-xs font-bold text-white">{activeWorkspaceName}</p>
           </div>
         </div>
-        <ChevronDown className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
+      {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/95 p-1.5 backdrop-blur-xl shadow-2xl">
-          <div className="px-2 py-1.5 text-[10px] font-semibold text-slate-400 uppercase">
-            Pilih Ruang Kerja
+        <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-2xl border border-slate-800 bg-slate-900 p-2 shadow-xl backdrop-blur-xl animate-in fade-in duration-150">
+          <div className="space-y-1">
+            {/* Personal Workspace */}
+            <button
+              type="button"
+              onClick={() => {
+                onSelectWorkspace(null, 'Personal Workspace');
+                setIsOpen(false);
+              }}
+              className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs font-medium transition ${
+                !currentOrgId ? 'bg-violet-500/10 text-violet-300' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <span>Personal Workspace</span>
+              {!currentOrgId && <Check className="h-4 w-4 text-violet-400" />}
+            </button>
+
+            {/* List Team Workspaces */}
+            {workspaces.map((ws) => {
+              const isSelected = ws.id === currentOrgId;
+              return (
+                <button
+                  key={ws.id}
+                  type="button"
+                  onClick={() => {
+                    onSelectWorkspace(ws.id, ws.name);
+                    setIsOpen(false);
+                  }}
+                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs font-medium transition ${
+                    isSelected ? 'bg-violet-500/10 text-violet-300' : 'text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <span className="truncate">{ws.name}</span>
+                  {isSelected && <Check className="h-4 w-4 text-violet-400" />}
+                </button>
+              );
+            })}
           </div>
 
+          <div className="my-2 border-t border-slate-800/80" />
+
+          {/* Tombol Buat Tim Baru (Ada indikator Kunci jika bukan Enterprise) */}
           <button
             type="button"
-            onClick={() => {
-              onSelectWorkspace(null, 'Personal Workspace');
-              setIsOpen(false);
-            }}
-            className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition ${
-              currentOrgId === null ? 'bg-violet-500/20 text-violet-200 font-semibold' : 'text-slate-300 hover:bg-slate-800'
-            }`}
+            onClick={handleCreateTeamClick}
+            className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-xs font-semibold text-violet-400 hover:bg-violet-500/10 transition"
           >
-            <div className="flex items-center gap-2">
-              <User className="h-3.5 w-3.5 text-slate-400" />
-              <span>Personal Workspace</span>
-            </div>
-            {currentOrgId === null && <Check className="h-3.5 w-3.5 text-violet-400" />}
-          </button>
-
-          {organizations.map((org) => {
-            const isSelected = currentOrgId === org.id;
-            return (
-              <button
-                key={org.id}
-                type="button"
-                onClick={() => {
-                  onSelectWorkspace(org.id, org.name);
-                  setIsOpen(false);
-                }}
-                className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition ${
-                  isSelected ? 'bg-violet-500/20 text-violet-200 font-semibold' : 'text-slate-300 hover:bg-slate-800'
-                }`}
-              >
-                <div className="flex items-center gap-2 truncate">
-                  <Building2 className="h-3.5 w-3.5 text-violet-400 shrink-0" />
-                  <span className="truncate">{org.name}</span>
-                </div>
-                {isSelected && <Check className="h-3.5 w-3.5 text-violet-400 shrink-0" />}
-              </button>
-            );
-          })}
-
-          <div className="my-1 border-t border-slate-800" />
-
-          <button
-            type="button"
-            onClick={() => {
-              setShowCreateModal(true);
-              setErrorMessage(null);
-            }}
-            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-violet-300 transition hover:bg-violet-500/10"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Buat Tim / Perusahaan Baru</span>
+            <span className="flex items-center gap-2">
+              <Plus className="h-4 w-4" /> + Buat Tim Baru
+            </span>
+            {subscriptionTier !== 'enterprise' && (
+              <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                <Sparkles className="h-2.5 w-2.5" /> Enterprise
+              </span>
+            )}
           </button>
         </div>
       )}
 
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+      {/* Modal Ketik Nama Tim Baru */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-white">Buat Team Workspace (Enterprise)</h3>
-            <p className="mt-1 text-xs text-slate-400">
-              Buat ruang kerja tim untuk mengundang desainer, mengagregasi task QC, dan mengelola branding perusahaan.
+            <h3 className="text-lg font-bold text-white mb-1">Buat Enterprise Team Baru</h3>
+            <p className="text-xs text-slate-400 mb-5">
+              Masukkan nama studio atau agensi untuk membuat ruang kerja bersama tim.
             </p>
 
-            {errorMessage && (
-              <div className="mt-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
-                {errorMessage}
-              </div>
-            )}
-
-            <form onSubmit={handleCreateOrg} className="mt-5 space-y-4">
+            <form onSubmit={handleCreateSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Nama Tim / Perusahaan</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">Nama Tim / Agensi *</label>
                 <input
                   type="text"
                   required
-                  placeholder="Contoh: Studio Agensi Kreatif"
+                  autoFocus
+                  placeholder="cth: Studio ABC / Agensi Kreatif..."
                   value={newOrgName}
                   onChange={(e) => setNewOrgName(e.target.value)}
-                  className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-xs text-white placeholder-slate-500 outline-none focus:border-violet-500"
+                  className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-xs text-white placeholder-slate-500 outline-none focus:border-violet-500"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-700"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="flex-1 rounded-2xl border border-slate-800 bg-slate-800/50 py-3 text-xs font-semibold text-slate-300 hover:bg-slate-800 transition"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  disabled={isCreating}
-                  className="rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-violet-500 disabled:opacity-50"
+                  disabled={isSubmitting}
+                  className="flex-1 rounded-2xl bg-violet-600 py-3 text-xs font-semibold text-white hover:bg-violet-500 transition shadow-lg shadow-violet-600/20"
                 >
-                  {isCreating ? 'Membuat...' : 'Buat Tim'}
+                  {isSubmitting ? 'Memproses...' : 'Buat Tim'}
                 </button>
               </div>
             </form>

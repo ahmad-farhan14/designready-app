@@ -52,7 +52,7 @@ export default function App() {
     setNotifState({ isOpen: true, title, message, type });
   };
 
-  // State Tier Subscription (starter | pro | enterprise) - disimpan ke localStorage
+  // State Tier Subscription (starter | pro | enterprise) - dibaca dari localStorage dulu
   const [subscriptionTier, setSubscriptionTier] = useState<'starter' | 'pro' | 'enterprise'>(() => {
     try {
       return (localStorage.getItem(USER_TIER_KEY) as 'starter' | 'pro' | 'enterprise') || 'starter';
@@ -144,11 +144,13 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fetch Profile Subscription Tier dari Database
+  // Fetch Profile Subscription Tier dari Database (Aman dari overwrite saat reload)
   useEffect(() => {
     if (!session?.user) return;
     async function fetchProfileTier() {
       try {
+        const savedLocalTier = localStorage.getItem(USER_TIER_KEY) as 'starter' | 'pro' | 'enterprise';
+
         const { data } = await supabase
           .from('profiles')
           .select('subscription_tier')
@@ -157,8 +159,12 @@ export default function App() {
 
         if (data?.subscription_tier) {
           const dbTier = data.subscription_tier as 'starter' | 'pro' | 'enterprise';
-          setSubscriptionTier(dbTier);
-          localStorage.setItem(USER_TIER_KEY, dbTier);
+          const activeTier = (savedLocalTier && savedLocalTier !== 'starter') ? savedLocalTier : dbTier;
+          
+          setSubscriptionTier(activeTier);
+          localStorage.setItem(USER_TIER_KEY, activeTier);
+        } else if (savedLocalTier) {
+          setSubscriptionTier(savedLocalTier);
         }
       } catch (err) {
         console.error('Gagal mengambil data tier subscription', err);
